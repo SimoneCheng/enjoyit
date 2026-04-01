@@ -31,4 +31,16 @@ public class GroupController {
             return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
         }
     }
+
+    @PostMapping("/login")
+    public ResponseEntity<?> loginGroup(@RequestBody Map<String, String> request) {
+        String id = request.get("id");
+        String password = request.get("password");
+        
+        if (groupService.login(id, password)) {
+            return ResponseEntity.ok(Map.of("message", "登入成功", "groupId", id.trim()));
+        } else {
+            return ResponseEntity.status(401).body(Map.of("error", "帳號或密碼錯誤"));
+        }
+    }
 }

@@ -3,91 +3,171 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Enjoyit - 建立揪團群組</title>
+    <title>Enjoyit - 揪團小幫手</title>
     <style>
-        body { font-family: sans-serif; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; background: #f0f2f5; }
-        .container { background: white; padding: 2rem; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); width: 100%; max-width: 400px; }
-        h1 { text-align: center; color: #1c1e21; }
-        .form-group { margin-bottom: 1rem; }
-        label { display: block; margin-bottom: 0.5rem; color: #4b4f56; }
-        input { width: 100%; padding: 0.5rem; border: 1px solid #ddd; border-radius: 4px; box-sizing: border-box; }
-        button { width: 100%; padding: 0.75rem; background: #1877f2; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 1rem; }
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; display: flex; justify-content: center; align-items: center; min-height: 100vh; margin: 0; background: #f0f2f5; }
+        .container { background: white; padding: 2.5rem; border-radius: 12px; box-shadow: 0 8px 24px rgba(0,0,0,0.12); width: 100%; max-width: 400px; }
+        h1 { text-align: center; color: #1c1e21; margin-bottom: 2rem; }
+        
+        /* Tabs */
+        .tabs { display: flex; border-bottom: 2px solid #f0f2f5; margin-bottom: 1.5rem; }
+        .tab { flex: 1; text-align: center; padding: 1rem; cursor: pointer; color: #65676b; font-weight: 600; transition: all 0.3s; }
+        .tab.active { color: #1877f2; border-bottom: 3px solid #1877f2; }
+        
+        .form-section { display: none; }
+        .form-section.active { display: block; }
+
+        .form-group { margin-bottom: 1.25rem; }
+        label { display: block; margin-bottom: 0.5rem; color: #4b4f56; font-size: 0.9rem; }
+        input { width: 100%; padding: 0.75rem; border: 1px solid #dddfe2; border-radius: 6px; box-sizing: border-box; font-size: 1rem; }
+        input:focus { outline: none; border-color: #1877f2; box-shadow: 0 0 0 2px #e7f3ff; }
+        
+        button { width: 100%; padding: 0.85rem; background: #1877f2; color: white; border: none; border-radius: 6px; cursor: pointer; font-size: 1.1rem; font-weight: 600; margin-top: 1rem; transition: background 0.2s; }
         button:hover { background: #166fe5; }
-        .message { margin-top: 1rem; padding: 0.75rem; border-radius: 4px; display: none; }
+        button.secondary { background: #42b72a; margin-top: 0.5rem; }
+        button.secondary:hover { background: #36a420; }
+
+        .message { margin-top: 1.5rem; padding: 1rem; border-radius: 6px; display: none; font-size: 0.95rem; line-height: 1.4; }
         .error { background: #ffebe9; color: #b00020; border: 1px solid #ff8182; }
         .success { background: #e7f3ff; color: #0064d2; border: 1px solid #1877f2; }
-        .share-link { margin-top: 1rem; font-size: 0.9rem; word-break: break-all; }
+        
+        .share-link { margin-top: 1.5rem; font-size: 0.85rem; color: #65676b; padding: 1rem; background: #f0f2f5; border-radius: 6px; border: 1px dashed #ccd0d5; word-break: break-all; }
+        code { display: block; background: white; padding: 0.5rem; margin: 0.5rem 0; border: 1px solid #ddd; border-radius: 4px; }
     </style>
 </head>
 <body>
     <div class="container">
-        <h1>註冊團購群組</h1>
-        <form id="registerForm">
-            <div class="form-group">
-                <label for="groupId">群組帳號</label>
-                <input type="text" id="groupId" required placeholder="輸入群組帳號">
-            </div>
-            <div class="form-group">
-                <label for="password">群組密碼</label>
-                <input type="password" id="password" required minlength="8" placeholder="至少 8 碼">
-            </div>
-            <button type="submit">立即建立</button>
-        </form>
+        <h1>Enjoyit 揪團</h1>
+        
+        <div class="tabs">
+            <div class="tab active" onclick="switchTab('login')">登入群組</div>
+            <div class="tab" onclick="switchTab('register')">建立群組</div>
+        </div>
+
+        <!-- 登入表單 -->
+        <div id="loginSection" class="form-section active">
+            <form id="loginForm">
+                <div class="form-group">
+                    <label for="loginId">群組帳號</label>
+                    <input type="text" id="loginId" required placeholder="輸入已建立的帳號">
+                </div>
+                <div class="form-group">
+                    <label for="loginPassword">密碼</label>
+                    <input type="password" id="loginPassword" required placeholder="輸入密碼">
+                </div>
+                <button type="submit">進入群組</button>
+            </form>
+        </div>
+
+        <!-- 註冊表單 -->
+        <div id="registerSection" class="form-section">
+            <form id="registerForm">
+                <div class="form-group">
+                    <label for="regId">新群組帳號</label>
+                    <input type="text" id="regId" required placeholder="例如：我的辦公室點餐">
+                </div>
+                <div class="form-group">
+                    <label for="regPassword">群組密碼</label>
+                    <input type="password" id="regPassword" required minlength="8" placeholder="至少 8 碼">
+                </div>
+                <button type="submit">立即建立</button>
+            </form>
+        </div>
+
         <div id="message" class="message"></div>
+        
         <div id="shareInfo" class="share-link" style="display:none;">
-            <p>註冊成功！分享登入連結：</p>
+            <p><strong>建立成功！</strong> 請分享連結或讓成員登入：</p>
             <code id="shareUrl"></code>
-            <button onclick="copyLink()" style="margin-top:0.5rem; background:#42b72a;">複製連結</button>
+            <button onclick="copyLink()" class="secondary">複製連結並前往登入</button>
         </div>
     </div>
 
     <script>
-        const form = document.getElementById('registerForm');
         const messageDiv = document.getElementById('message');
         const shareInfo = document.getElementById('shareInfo');
         const shareUrlCode = document.getElementById('shareUrl');
 
-        form.addEventListener('submit', async (e) => {
-            e.preventDefault();
+        // 切換頁籤
+        function switchTab(type) {
+            document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+            document.querySelectorAll('.form-section').forEach(s => s.classList.remove('active'));
             messageDiv.style.display = 'none';
             shareInfo.style.display = 'none';
 
-            const groupId = document.getElementById('groupId').value;
-            const password = document.getElementById('password').value;
+            if (type === 'login') {
+                document.querySelectorAll('.tab')[0].classList.add('active');
+                document.getElementById('loginSection').classList.add('active');
+            } else {
+                document.querySelectorAll('.tab')[1].classList.add('active');
+                document.getElementById('registerSection').classList.add('active');
+            }
+        }
+
+        // 登入處理
+        document.getElementById('loginForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const id = document.getElementById('loginId').value;
+            const password = document.getElementById('loginPassword').value;
+
+            try {
+                const response = await fetch('/api/groups/login', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ id, password })
+                });
+                const data = await response.json();
+
+                if (response.ok) {
+                    showMessage(data.message, 'success');
+                    // 這裡以後可以導向點餐頁面
+                } else {
+                    showMessage(data.error, 'error');
+                }
+            } catch (error) {
+                showMessage('連線失敗，請檢查網路', 'error');
+            }
+        });
+
+        // 註冊處理
+        document.getElementById('registerForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const id = document.getElementById('regId').value;
+            const password = document.getElementById('regPassword').value;
 
             try {
                 const response = await fetch('/api/groups/register', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ id: groupId, password: password })
+                    body: JSON.stringify({ id, password })
                 });
-
                 const data = await response.json();
 
                 if (response.ok) {
-                    messageDiv.textContent = data.message;
-                    messageDiv.className = 'message success';
-                    messageDiv.style.display = 'block';
-                    
                     const fullUrl = window.location.origin + data.shareUrl;
                     shareUrlCode.textContent = fullUrl;
                     shareInfo.style.display = 'block';
+                    // 預填登入帳號方便使用者
+                    document.getElementById('loginId').value = id;
                 } else {
-                    messageDiv.textContent = data.error || '註冊失敗';
-                    messageDiv.className = 'message error';
-                    messageDiv.style.display = 'block';
+                    showMessage(data.error, 'error');
                 }
             } catch (error) {
-                messageDiv.textContent = '系統連線異常，請稍後再試';
-                messageDiv.className = 'message error';
-                messageDiv.style.display = 'block';
+                showMessage('系統異常，請稍後再試', 'error');
             }
         });
+
+        function showMessage(text, type) {
+            messageDiv.textContent = text;
+            messageDiv.className = `message ${type}`;
+            messageDiv.style.display = 'block';
+        }
 
         function copyLink() {
             const link = shareUrlCode.textContent;
             navigator.clipboard.writeText(link).then(() => {
-                alert('連結已複製到剪貼簿');
+                alert('連結已複製！請使用該帳號密碼登入。');
+                switchTab('login');
             });
         }
     </script>

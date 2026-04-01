@@ -25,4 +25,10 @@ public class GroupService {
         Group group = new Group(trimmedId, encryptedPassword);
         return groupRepository.save(group);
     }
+
+    public boolean login(String id, String rawPassword) {
+        return groupRepository.findById(id.trim())
+                .map(group -> passwordEncoder.matches(rawPassword.trim(), group.getPassword()))
+                .orElse(false);
+    }
 }
