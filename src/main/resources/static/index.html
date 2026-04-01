@@ -24,15 +24,10 @@
         
         button { width: 100%; padding: 0.85rem; background: #1877f2; color: white; border: none; border-radius: 6px; cursor: pointer; font-size: 1.1rem; font-weight: 600; margin-top: 1rem; transition: background 0.2s; }
         button:hover { background: #166fe5; }
-        button.secondary { background: #42b72a; margin-top: 0.5rem; }
-        button.secondary:hover { background: #36a420; }
 
-        .message { margin-top: 1.5rem; padding: 1rem; border-radius: 6px; display: none; font-size: 0.95rem; line-height: 1.4; }
+        .message { margin-top: 1.5rem; padding: 1rem; border-radius: 6px; display: none; font-size: 0.95rem; line-height: 1.4; text-align: center; }
         .error { background: #ffebe9; color: #b00020; border: 1px solid #ff8182; }
         .success { background: #e7f3ff; color: #0064d2; border: 1px solid #1877f2; }
-        
-        .share-link { margin-top: 1.5rem; font-size: 0.85rem; color: #65676b; padding: 1rem; background: #f0f2f5; border-radius: 6px; border: 1px dashed #ccd0d5; word-break: break-all; }
-        code { display: block; background: white; padding: 0.5rem; margin: 0.5rem 0; border: 1px solid #ddd; border-radius: 4px; }
     </style>
 </head>
 <body>
@@ -75,25 +70,23 @@
         </div>
 
         <div id="message" class="message"></div>
-        
-        <div id="shareInfo" class="share-link" style="display:none;">
-            <p><strong>建立成功！</strong> 請分享連結或讓成員登入：</p>
-            <code id="shareUrl"></code>
-            <button onclick="copyLink()" class="secondary">複製連結並前往登入</button>
-        </div>
     </div>
 
     <script>
         const messageDiv = document.getElementById('message');
-        const shareInfo = document.getElementById('shareInfo');
-        const shareUrlCode = document.getElementById('shareUrl');
+
+        // 清空所有輸入框
+        function clearInputs() {
+            document.querySelectorAll('input').forEach(input => input.value = '');
+        }
 
         // 切換頁籤
         function switchTab(type) {
             document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
             document.querySelectorAll('.form-section').forEach(s => s.classList.remove('active'));
+            
             messageDiv.style.display = 'none';
-            shareInfo.style.display = 'none';
+            clearInputs(); // 切換時清空
 
             if (type === 'login') {
                 document.querySelectorAll('.tab')[0].classList.add('active');
@@ -120,7 +113,7 @@
 
                 if (response.ok) {
                     showMessage(data.message, 'success');
-                    // 這裡以後可以導向點餐頁面
+                    clearInputs(); // 登入成功後清空
                 } else {
                     showMessage(data.error, 'error');
                 }
@@ -144,11 +137,8 @@
                 const data = await response.json();
 
                 if (response.ok) {
-                    const fullUrl = window.location.origin + data.shareUrl;
-                    shareUrlCode.textContent = fullUrl;
-                    shareInfo.style.display = 'block';
-                    // 預填登入帳號方便使用者
-                    document.getElementById('loginId').value = id;
+                    showMessage('已成功建立群組，請點擊登入進行登入', 'success');
+                    clearInputs(); // 建立成功後清空
                 } else {
                     showMessage(data.error, 'error');
                 }
@@ -161,14 +151,6 @@
             messageDiv.textContent = text;
             messageDiv.className = `message ${type}`;
             messageDiv.style.display = 'block';
-        }
-
-        function copyLink() {
-            const link = shareUrlCode.textContent;
-            navigator.clipboard.writeText(link).then(() => {
-                alert('連結已複製！請使用該帳號密碼登入。');
-                switchTab('login');
-            });
         }
     </script>
 </body>
