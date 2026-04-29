@@ -100,7 +100,7 @@
         // 登入處理
         document.getElementById('loginForm').addEventListener('submit', async (e) => {
             e.preventDefault();
-            const id = document.getElementById('loginId').value;
+            const id = document.getElementById('loginId').value.trim();
             const password = document.getElementById('loginPassword').value;
 
             try {
@@ -113,7 +113,10 @@
 
                 if (response.ok) {
                     showMessage(data.message, 'success');
-                    clearInputs(); // 登入成功後清空
+                    // 延遲一小段時間讓使用者看見訊息後跳管理頁面
+                    setTimeout(() => {
+                        window.location.href = 'dashboard.html?groupId=' + data.groupId;
+                    }, 1000);
                 } else {
                     showMessage(data.error, 'error');
                 }

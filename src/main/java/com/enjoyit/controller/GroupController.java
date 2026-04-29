@@ -23,9 +23,9 @@ public class GroupController {
         try {
             Group group = groupService.createGroup(request.getId(), request.getPassword());
             return ResponseEntity.ok(Map.of(
-                "message", "註冊成功",
-                "groupId", group.getId(),
-                "shareUrl", "/login?groupId=" + group.getId()
+                    "message", "註冊成功",
+                    "groupId", group.getId(),
+                    "shareUrl", "/login?groupId=" + group.getId()
             ));
         } catch (IllegalArgumentException e) {
             return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
@@ -36,7 +36,7 @@ public class GroupController {
     public ResponseEntity<?> loginGroup(@RequestBody Map<String, String> request) {
         String id = request.get("id");
         String password = request.get("password");
-        
+
         if (groupService.login(id, password)) {
             return ResponseEntity.ok(Map.of("message", "登入成功", "groupId", id.trim()));
         } else {

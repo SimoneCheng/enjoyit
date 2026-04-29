@@ -32,7 +32,7 @@ class GroupServiceTest {
         String id = "  testGroup  ";
         String password = "password123";
         String encryptedPassword = "encryptedPassword";
-        
+
         when(groupRepository.findById("testGroup")).thenReturn(Optional.empty());
         when(passwordEncoder.encode(password)).thenReturn(encryptedPassword);
         when(groupRepository.save(any(Group.class))).thenAnswer(invocation -> invocation.getArgument(0));

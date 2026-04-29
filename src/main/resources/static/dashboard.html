@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Enjoyit - 主揪管理後台</title>
+    <style>
+        :root { --primary-color: #1877f2; --bg-color: #f0f2f5; }
+        body { font-family: 'Segoe UI', sans-serif; margin: 0; background: var(--bg-color); display: flex; flex-direction: column; min-height: 100vh; }
+
+        /* 導覽列 */
+        .navbar { background: white; padding: 0.5rem 2rem; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .nav-brand { font-size: 1.5rem; font-weight: bold; color: var(--primary-color); }
+        .nav-links a, .logout-btn { margin-left: 1rem; text-decoration: none; color: #65676b; cursor: pointer; font-weight: 500; }
+        .logout-btn { color: #d32f2f; border: none; background: none; font-size: 1rem; }
+
+        .main-layout { display: flex; flex: 1; padding: 2rem; gap: 2rem; }
+
+        /* 左側按鈕選單 */
+        .sidebar { width: 250px; background: white; padding: 1.5rem; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.05); }
+        .menu-btn { width: 100%; padding: 12px; margin-bottom: 0.5rem; border: none; border-radius: 6px; text-align: left; cursor: pointer; background: transparent; font-size: 1rem; color: #4b4f56; transition: 0.2s; }
+        .menu-btn:hover { background: #f0f2f5; }
+        .menu-btn.active { background: #e7f3ff; color: var(--primary-color); font-weight: 600; }
+
+        /* 右側內容區 */
+        .content-area { flex: 1; background: white; padding: 2rem; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.05); }
+        .form-group { margin-bottom: 1.5rem; }
+        label { display: block; margin-bottom: 0.5rem; font-weight: 600; }
+        input, textarea { width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 6px; box-sizing: border-box; }
+        .action-btn { background: var(--primary-color); color: white; border: none; padding: 12px 24px; border-radius: 6px; cursor: pointer; font-weight: 600; }
+
+        .section-content { display: none; }
+        .section-content.active { display: block; }
+    </style>
+</head>
+<body>
+
+<nav class="navbar">
+    <div class="nav-brand">Enjoyit 揪團管理</div>
+    <div class="nav-links">
+        <a href="index.html">回首頁</a>
+        <button class="logout-btn" onclick="logout()">登出</button>
+    </div>
+</nav>
+
+<div class="main-layout">
+    <aside class="sidebar">
+        <button class="menu-btn active" onclick="showSection('publish')">🚀 發起團購 (UC-04)</button>
+        <button class="menu-btn" onclick="showSection('store')">🏪 新增店家 (UC-02)</button>
+        <button class="menu-btn" onclick="showSection('summary')">📊 報表產出 (UC-04)</button>
+    </aside>
+
+    <main class="content-area">
+
+        <section id="publishSection" class="section-content active">
+            <h2>發起新團購</h2>
+            <div class="form-group">
+                <label>團購名稱 / 店家資訊</label>
+                <input type="text" id="orderInfo" placeholder="例如：迷O夏大安店">
+            </div>
+            <div class="form-group">
+                <label>群組公告</label>
+                <textarea id="announcement" rows="3" placeholder="請輸入公告內容..."></textarea>
+            </div>
+            <div class="form-group">
+                <label>設定截止時間</label>
+                <label for="deadline"></label><input type="datetime-local" id="deadline">
+            </div>
+            <button class="action-btn" onclick="publishOrder()">確認發布</button>
+        </section>
+
+        <section id="storeSection" class="section-content">
+            <h2>新增店家資訊</h2>
+            <div class="form-group">
+                <label>店家名稱</label>
+                <input type="text" placeholder="輸入店家名稱">
+            </div>
+            <div class="form-group">
+                <label>店家電話</label>
+                <input type="text" placeholder="輸入聯絡電話">
+            </div>
+            <button class="action-btn">儲存店家資料</button>
+            <p style="color: #65676b; margin-top: 10px;">(此部分對應 UC-02 流程)</p>
+        </section>
+
+        <section id="summarySection" class="section-content">
+            <h2>訂單明細總表</h2>
+            <p>僅在團購截止後可產出統計資料。</p>
+            <button class="action-btn" style="background: #27ae60;" onclick="getSummary()">產生彙整報表 (CO-10)</button>
+            <div id="summaryDisplay" style="margin-top: 20px;"></div>
+        </section>
+
+    </main>
+</div>
+
+<script>
+    // 切換側邊欄區塊
+    function showSection(id) {
+        document.querySelectorAll('.section-content').forEach(s => s.classList.remove('active'));
+        document.querySelectorAll('.menu-btn').forEach(b => b.classList.remove('active'));
+
+        document.getElementById(id + 'Section').classList.add('active');
+        event.currentTarget.classList.add('active');
+    }
+
+    // 登出功能
+    function logout() {
+        if(confirm('確定要登出嗎？')) {
+            window.location.href = 'index.html';
+        }
+    }
+
+    // 發布團購
+    async function publishOrder() {
+        const orderInfo = document.getElementById('orderInfo').value.trim();
+        const announcement = document.getElementById('announcement').value.trim();
+        const deadline = document.getElementById('deadline').value; // 格式通常為 "2026-04-29T14:30"
+
+        if (!orderInfo) {
+            alert("請輸入團購名稱！"); // 符合 UC-04 Extension 4a [cite: 99]
+            return;
+        }
+
+        try {
+            // 發布團購
+            const response = await fetch('/api/group-orders/publish', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ orderInfo, announcement })
+            });
+            if (response.ok) {
+                const link = await response.text();
+
+                // 第二步：如果有選時間，再更新時限 (CO-08)
+                if (deadline && deadline !== "") {
+                    const deadlineRes = await fetch('/api/group-orders/deadline', {
+                        method: 'PUT',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ deadline: deadline }) // 這裡會對應到你的 DeadlineRequest DTO
+                    });
+
+                    if (!deadlineRes.ok) {
+                        console.error("時間設定失敗");
+                    }
+                }
+
+                alert("發布成功！點餐連結為：" + link);
+            } else {
+                const errorMsg = await response.text();
+                alert("發布失敗：" + errorMsg);
+            }
+        } catch (error) {
+            console.error("Fetch Error:", error);
+            alert("系統連線異常");
+        }
+    }
+
+    // 產出報表 (CO-10)
+    async function getSummary() {
+        const displayDiv = document.getElementById('summaryDisplay');
+        displayDiv.innerHTML = "<p>正在彙整訂單...</p>";
+
+        try {
+            const response = await fetch('/api/group-orders/summary');
+
+            if (response.ok) {
+                const data = await response.json();
+                // 格式化顯示聚合後的資料
+                displayDiv.innerHTML = `
+                    <div style="background: #e7f3ff; padding: 15px; border-radius: 8px;">
+                        <strong>統計結果 (OrderItemSummary)：</strong>
+                        <pre>${JSON.stringify(data, null, 2)}</pre>
+                    </div>
+                `;
+            } else {
+                // 符合 CO-10 Precondition: 團購未截止則報錯 [cite: 171]
+                displayDiv.innerHTML = "<p style='color:red;'>錯誤：團購尚未結單，無法產出總表。</p>";
+            }
+        } catch (error) {
+            displayDiv.innerHTML = "<p style='color:red;'>連線失敗。</p>";
+        }
+    }
+</script>
+</body>
+</html>
