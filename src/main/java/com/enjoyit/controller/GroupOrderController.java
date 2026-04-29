@@ -18,6 +18,7 @@ public class GroupOrderController {
     // 模擬 Heap 記憶體存儲
     private GroupOrder currentGroupOrder;
     private final PasswordValidator passwordValidator = new PasswordValidator();
+    private Map<String, GroupOrder> ordersMap = new java.util.concurrent.ConcurrentHashMap<>();
 
     /**
      * CO-07: publishGroupOrder(orderInfo, announcement)
@@ -28,14 +29,29 @@ public class GroupOrderController {
         String orderInfo = request.get("orderInfo");
         String announcement = request.get("announcement");
 
-        // 建立實例並設定初始狀態
-        currentGroupOrder = new GroupOrder(orderInfo);
-        if (announcement != null && !announcement.isEmpty()) {
-            currentGroupOrder.setAnnouncement(announcement);
-        }
+        GroupOrder newOrder = new GroupOrder(orderInfo);
+        // 產生一個唯一 ID (例如用 timestamp)
+        String orderId = "order_" + System.currentTimeMillis();
+        newOrder.setOrderId(orderId);
 
-        currentGroupOrder.setStatus("進行中");
-        return ResponseEntity.ok("displayOrderLink");
+        if (announcement != null && !announcement.isEmpty()) {
+            newOrder.setAnnouncement(announcement);
+        }
+        newOrder.setStatus("進行中");
+
+        // 存入 Map
+        ordersMap.put(orderId, newOrder);
+        // 更新 currentGroupOrder
+        this.currentGroupOrder = newOrder;
+
+        // 回傳 ID 供前端導向
+        return ResponseEntity.ok(orderId);
+    }
+
+    // 供左側列表讀取所有團購
+    @GetMapping("/all")
+    public ResponseEntity<?> getAllOrders() {
+        return ResponseEntity.ok(ordersMap.values());
     }
 
     /**
@@ -56,7 +72,7 @@ public class GroupOrderController {
 
             if (currentGroupOrder != null) {
                 currentGroupOrder.setOrderDeadline(newTime);
-                return ResponseEntity.ok("已設定截止時間：" + newTime.toString());
+                return ResponseEntity.ok("已設定截止時間");
             }
             return ResponseEntity.badRequest().body("尚未建立團購活動");
 
@@ -81,6 +97,16 @@ public class GroupOrderController {
             return ResponseEntity.ok("AuthToken_Issued");
         }
         return ResponseEntity.status(401).body("Invalid Password");
+    }
+
+    @PostMapping("/close/{orderId}")
+    public ResponseEntity<?> closeOrder(@PathVariable String orderId) {
+        GroupOrder order = ordersMap.get(orderId);
+        if (order != null) {
+            order.setStatus("已結單");
+            return ResponseEntity.ok("訂單已成功結單");
+        }
+        return ResponseEntity.badRequest().body("找不到該訂單");
     }
 
     /**
