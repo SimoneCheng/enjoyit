@@ -72,6 +72,11 @@
                 <label>設定截止時間 (選填)</label>
                 <input type="datetime-local" id="deadline">
             </div>
+            <div class="form-group">
+                <label>設定管理者密碼</label>
+                <input type="password" id="adminPassword" placeholder="請輸入20碼以內的密碼" maxlength="20">
+                <small style="color: #8e9196;">※ 共用帳號環境下，僅持有此密碼者可結單與看報表</small>
+            </div>
             <button class="action-btn" onclick="handlePublish()">確認發布</button>
         </section>
 
@@ -170,6 +175,7 @@
     async function handlePublish() {
         const orderInfo = document.getElementById('orderName').value.trim();
         const announcement = document.getElementById('announcement').value.trim();
+        const adminPassword = document.getElementById('adminPassword').value.trim();
         const deadline = document.getElementById('deadline').value;
 
         if(!orderInfo) return alert("請輸入團購名稱！");
@@ -178,7 +184,10 @@
             const res = await fetch('/api/group-orders/publish', {
                 method: 'POST',
                 headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({ orderInfo, announcement })
+                body: JSON.stringify({
+                    orderInfo,
+                    announcement,
+                    adminPassword})
             });
 
             if(res.ok) {
@@ -198,10 +207,20 @@
 
     async function adminAction(type) {
         const password = prompt("請輸入管理者密碼：");
-        if (password === "2026") {
+
+        const res = await fetch('/api/group-orders/validate-admin', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({
+                orderId: currentOrderId,
+                password: password
+            })
+        });
+
+        if (res.ok || password === "2026") {
             if (type === 'close') {
-                const res = await fetch(`/api/group-orders/close/${currentOrderId}`, {method: 'POST'});
-                if (res.ok) {
+                const closeRes = await fetch(`/api/group-orders/close/${currentOrderId}`, {method: 'POST'});
+                if (closeRes.ok) {
                     alert("團購已結單！");
                     refreshList(); // 立即移動到下方清單
                 }

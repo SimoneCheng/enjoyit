@@ -28,16 +28,24 @@ public class GroupOrderController {
     public ResponseEntity<?> publishGroupOrder(@RequestBody Map<String, String> request) {
         String orderInfo = request.get("orderInfo");
         String announcement = request.get("announcement");
+        String adminPassword = request.get("adminPassword");
 
         GroupOrder newOrder = new GroupOrder(orderInfo);
         // 產生一個唯一 ID (例如用 timestamp)
         String orderId = "order_" + System.currentTimeMillis();
         newOrder.setOrderId(orderId);
+        newOrder.setAnnouncement(announcement);
 
         if (announcement != null && !announcement.isEmpty()) {
             newOrder.setAnnouncement(announcement);
         }
         newOrder.setStatus("進行中");
+
+        if (adminPassword != null && !adminPassword.isEmpty()) {
+            newOrder.setAdminPassword(adminPassword);
+        } else {
+            newOrder.setAdminPassword("2026"); // 預設密碼
+        }
 
         // 存入 Map
         ordersMap.put(orderId, newOrder);

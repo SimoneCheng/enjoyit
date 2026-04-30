@@ -17,7 +17,7 @@ public class GroupOrder {
         this.orderInfo = info; // 確保名稱有存進去
         this.status = "進行中";  // 設定初始狀態
         // 生成管理者密碼，對應 CO-09
-        this.adminPassword = "pwd" + String.valueOf(System.currentTimeMillis()).substring(8);
+        // this.adminPassword = "pwd" + String.valueOf(System.currentTimeMillis()).substring(8);
 
         // 先預設訂單內有這三項商品
         this.orderItems.add(new OrderItem("大杯珍珠奶茶",2, 60, "預設奶茶"));
@@ -40,17 +40,17 @@ public class GroupOrder {
     public void setAnnouncement(String announcement) {
         this.announcement = announcement;
     }
-
     public void setStatus(String status) {
         this.status = status;
     }
-
     public void setOrderInfo(String orderInfo) {
         this.orderInfo = orderInfo;
     }
-
     public void setOrderId(String orderId) {
         this.orderId = orderId;
+    }
+    public void setAdminPassword(String adminPassword) {
+        this.adminPassword = adminPassword;
     }
 
     // Getters
