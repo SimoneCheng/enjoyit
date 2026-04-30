@@ -16,7 +16,7 @@
 
         /* 側邊欄 */
         .sidebar { width: 260px; background: white; padding: 1.5rem; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.05); }
-        .sidebar-title { font-size: 0.85rem; color: #8e9196; text-transform: uppercase; margin-bottom: 15px; font-weight: bold; }
+        .sidebar-title { font-size: 0.85rem; color: #8e9196; text-transform: uppercase; margin-bottom: 10px; font-weight: bold; margin-top: 20px; }
         .menu-btn { width: 100%; padding: 12px; margin-bottom: 0.5rem; border: none; border-radius: 6px; text-align: left; cursor: pointer; background: transparent; transition: 0.2s; }
         .menu-btn:hover { background: #f0f2f5; }
         .menu-btn.active { background: #e7f3ff; color: var(--primary-color); font-weight: 600; }
@@ -34,6 +34,9 @@
         .action-btn { background: var(--primary-color); color: white; border: none; padding: 12px 24px; border-radius: 6px; cursor: pointer; font-weight: 600; }
         .success-btn { background: var(--success-color); }
         .danger-btn { background: var(--danger-color); }
+
+        /* 倒數計時樣式 */
+        #countdownDisplay { color: #d32f2f; font-weight: bold; margin-top: 5px; font-size: 0.9rem; }
     </style>
 </head>
 <body>
@@ -49,6 +52,9 @@
         <hr>
         <div class="sidebar-title">進行中的團購</div>
         <div id="activeOrdersList"></div>
+
+        <div class="sidebar-title">已結單的團購</div>
+        <div id="finishedOrdersList"></div>
     </aside>
 
     <main class="content-area">
@@ -59,7 +65,7 @@
                 <input type="text" id="orderName" placeholder="請輸入團購標題">
             </div>
             <div class="form-group">
-                <label>群組公告</label>
+                <label>群組公告 (選填)</label>
                 <textarea id="announcement" rows="3" placeholder="請輸入欲傳達給參與者的資訊..."></textarea>
             </div>
             <div class="form-group">
@@ -71,17 +77,20 @@
 
         <section id="itemSection" class="section-content">
             <h2 id="viewingOrderName">載入中...</h2>
-            <div id="orderAnnouncementDisplay" style="color: #666; font-style: italic; margin-bottom: 20px; padding: 10px; background: #fffde7; border-left: 4px solid #fdd835;"></div>
+            <div id="orderAnnouncementDisplay" style="color: #666; font-style: italic; margin-bottom: 20px; padding: 10px; background: #fffde7; border-left: 4px solid #fdd835;">
+                <div id="announcementText">📢 公告：無公告</div>
+                <div id="countdownDisplay"></div>
+            </div>
 
             <div style="background: #f9f9f9; padding: 15px; border-radius: 8px; margin-bottom: 20px;">
                 <h4>個人點餐</h4>
-                <input type="text" id="itemName" placeholder="商品名稱 (如：大杯紅豆拿鐵)">
+                <input type="text" id="itemName" placeholder="商品名稱">
                 <input type="number" id="itemPrice" placeholder="價格" style="width: 80px;">
-                <button class="action-btn" style="padding: 5px 15px;" onclick="alert('餐點已新增！')">加入訂單</button>
+                <button class="action-btn" id="addItemBtn" style="padding: 5px 15px;" onclick="alert('餐點已新增！')">加入訂單</button>
             </div>
 
             <div class="btn-group">
-                <button class="action-btn danger-btn" onclick="adminAction('close')">🔒 結束團購</button>
+                <button class="action-btn danger-btn" id="closeOrderBtn" onclick="adminAction('close')">🔒 結束團購</button>
                 <button class="action-btn success-btn" onclick="adminAction('summary')">📊 輸出訂單明細總表</button>
             </div>
             <div id="summaryResult" style="margin-top: 15px;"></div>
@@ -91,6 +100,7 @@
 
 <script>
     let currentOrderId = null;
+    let countdownTimer = null;
 
     window.onload = refreshList;
 
@@ -103,15 +113,27 @@
         try {
             const res = await fetch('/api/group-orders/all');
             const orders = await res.json();
-            const listDiv = document.getElementById('activeOrdersList');
-            listDiv.innerHTML = '';
+
+            const activeListDiv = document.getElementById('activeOrdersList');
+            const finishedListDiv = document.getElementById('finishedOrdersList');
+
+            activeListDiv.innerHTML = '';
+            finishedListDiv.innerHTML = '';
 
             orders.forEach(order => {
                 const btn = document.createElement('div');
                 btn.className = 'menu-btn';
-                btn.innerHTML = `🥤 ${order.orderInfo || '未命名團購'}`;
-                btn.onclick = () => goToItemView(order);
-                listDiv.appendChild(btn);
+
+                // 根據狀態分配列表
+                if (order.status === "已結單") {
+                    btn.innerHTML = `✅ ${order.orderInfo}`;
+                    btn.onclick = () => goToItemView(order);
+                    finishedListDiv.appendChild(btn);
+                } else {
+                    btn.innerHTML = `🥤 ${order.orderInfo}`;
+                    btn.onclick = () => goToItemView(order);
+                    activeListDiv.appendChild(btn);
+                }
             });
         } catch (e) { console.error("Refresh list failed"); }
     }
@@ -119,24 +141,28 @@
     function goToItemView(order) {
         currentOrderId = order.orderId;
 
-        // 更新顯示標題與公告
+        // 更新標題與公告
         document.getElementById('viewingOrderName').textContent = "團購： " + (order.orderInfo || "未命名");
-        document.getElementById('orderAnnouncementDisplay').textContent = "📢 公告：" + (order.announcement || "無公告");
+        document.getElementById('announcementText').textContent = "📢 公告：" + (order.announcement || "無公告");
 
-        // 回填發起畫面的輸入框
+        // 啟動倒數計時
+        startCountdown(order.deadline, order.status);
+
+        // 回填資訊
         document.getElementById('orderName').value = order.orderInfo || "";
         document.getElementById('announcement').value = order.announcement || "";
-
-        // 處理時間
         if (order.deadline) {
-            // 後端傳來的可能是 2026-04-29T14:41:00，前端 datetime-local 需要這種格式
             document.getElementById('deadline').value = order.deadline.substring(0, 16);
         } else {
             document.getElementById('deadline').value = "";
         }
 
-        fetch(`/api/group-orders/select/${order.orderId}`, { method: 'POST' });
+        // 如果已結單，禁用按鈕
+        const isClosed = order.status === "已結單";
+        document.getElementById('addItemBtn').disabled = isClosed;
+        document.getElementById('closeOrderBtn').disabled = isClosed;
 
+        fetch(`/api/group-orders/select/${order.orderId}`, { method: 'POST' });
         showSection('item');
         document.getElementById('summaryResult').innerHTML = "";
     }
@@ -149,7 +175,6 @@
         if(!orderInfo) return alert("請輸入團購名稱！");
 
         try {
-            // Step 1: 發布
             const res = await fetch('/api/group-orders/publish', {
                 method: 'POST',
                 headers: {'Content-Type': 'application/json'},
@@ -158,8 +183,6 @@
 
             if(res.ok) {
                 const orderId = await res.text();
-
-                // Step 2: 設定時限
                 if (deadline) {
                     await fetch('/api/group-orders/deadline', {
                         method: 'PUT',
@@ -167,12 +190,7 @@
                         body: JSON.stringify({ deadline })
                     });
                 }
-
                 alert("團購發起成功！");
-                // 清空輸入
-                document.getElementById('orderName').value = "";
-                document.getElementById('announcement').value = "";
-                document.getElementById('deadline').value = "";
                 refreshList();
             }
         } catch (e) { alert("連線異常"); }
@@ -184,14 +202,50 @@
             if (type === 'close') {
                 const res = await fetch(`/api/group-orders/close/${currentOrderId}`, {method: 'POST'});
                 if (res.ok) {
-                    alert("團購已結單！現在可以產出明細總表了。");
+                    alert("團購已結單！");
+                    refreshList(); // 立即移動到下方清單
                 }
             } else {
-                fetchSummary();
+                await fetchSummary();
             }
         } else {
             alert("權限不足！只有管理者可以執行此操作。");
         }
+    }
+
+    function startCountdown(deadlineStr, currentStatus) {
+        if (countdownTimer) clearInterval(countdownTimer);
+        const display = document.getElementById('countdownDisplay');
+
+        if (currentStatus === "已結單") {
+            display.textContent = "⏱️ 狀態：已結單";
+            return;
+        }
+
+        if (!deadlineStr) {
+            display.textContent = "⏱️ 狀態：手動結單模式";
+            return;
+        }
+
+        const deadline = new Date(deadlineStr).getTime();
+
+        countdownTimer = setInterval(() => {
+            const now = new Date().getTime();
+            const distance = deadline - now;
+
+            if (distance < 0) {
+                clearInterval(countdownTimer);
+                display.textContent = "⏱️ 狀態：時間已到，已結單";
+                refreshList(); // 自動刷新狀態
+                return;
+            }
+
+            const hours = Math.floor((distance % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+            const minutes = Math.floor((distance % (1000 * 60 * 60)) / (1000 * 60));
+            const seconds = Math.floor((distance % (1000 * 60)) / 1000);
+
+            display.textContent = `⏱️ 剩餘時間：${hours}時 ${minutes}分 ${seconds}秒`;
+        }, 1000);
     }
 
     async function fetchSummary() {
@@ -199,12 +253,12 @@
         if(res.ok) {
             const data = await res.json();
             document.getElementById('summaryResult').innerHTML = `
-                    <div style="background:#e3f2fd; padding:15px; border-radius:5px; border:1px solid #2196f3;">
-                        <strong>統計總表 (OrderItemSummary)：</strong><br>
-                        <pre>${JSON.stringify(data, null, 2)}</pre>
-                    </div>`;
+                <div style="background:#e3f2fd; padding:15px; border-radius:5px; border:1px solid #2196f3;">
+                    <strong>統計總表 (OrderItemSummary)：</strong><br>
+                    <pre>${JSON.stringify(data, null, 2)}</pre>
+                </div>`;
         } else {
-            alert("團購尚未截止，無法產出總表。");
+            alert("尚未結單，無法產出總表。");
         }
     }
 </script>

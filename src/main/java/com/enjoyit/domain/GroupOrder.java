@@ -20,9 +20,9 @@ public class GroupOrder {
         this.adminPassword = "pwd" + String.valueOf(System.currentTimeMillis()).substring(8);
 
         // 先預設訂單內有這三項商品
-        this.orderItems.add(new OrderItem("大杯珍珠奶茶",1, 60, "預設"));
-        this.orderItems.add(new OrderItem("紅茶拿鐵", 1, 70, "預設"));
-        this.orderItems.add(new OrderItem("四季春青茶", 1, 35, "預設"));
+        this.orderItems.add(new OrderItem("大杯珍珠奶茶",2, 60, "預設奶茶"));
+        this.orderItems.add(new OrderItem("紅茶拿鐵", 1, 70, "預設紅茶拿鐵"));
+        this.orderItems.add(new OrderItem("四季春青茶", 3, 35, "預設青茶"));
     }
 
     /**
@@ -31,11 +31,12 @@ public class GroupOrder {
      */
     public void setOrderDeadline(LocalDateTime newTime) {
         this.deadline = newTime;
-        if (newTime.isBefore(LocalDateTime.now())) {
+        if (newTime != null && newTime.isBefore(LocalDateTime.now())) {
             this.status = "已結單";
         }
     }
 
+    // Setters
     public void setAnnouncement(String announcement) {
         this.announcement = announcement;
     }
@@ -52,8 +53,14 @@ public class GroupOrder {
         this.orderId = orderId;
     }
 
-    // Getters 供 Controller 或聚合器使用
-    public String getStatus() { return status; }
+    // Getters
+    public String getStatus() {
+        // 如果目前狀態是進行中，但時間已經超過截止日期，則自動結單
+        if ("進行中".equals(this.status) && deadline != null && LocalDateTime.now().isAfter(deadline)) {
+            this.status = "已結單";
+        }
+        return status;
+    }
     public String getAdminPassword() { return adminPassword; }
     public List<OrderItem> getOrderItems() { return orderItems; }
     public String getOrderInfo() { return orderInfo; }
