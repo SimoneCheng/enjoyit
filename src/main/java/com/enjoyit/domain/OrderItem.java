@@ -6,10 +6,10 @@ package com.enjoyit.domain;
 public class OrderItem {
     private String itemName;     // 品項名稱
     private int quantity;        // 數量
-    private double unitPrice;    // 單價
+    private int unitPrice;    // 單價
     private String orderFor;     // 實際訂購者姓名 (支援代點功能)
 
-    public OrderItem(String itemName, int quantity, double unitPrice, String orderFor) {
+    public OrderItem(String itemName, int quantity, int unitPrice, String orderFor) {
         this.itemName = itemName;
         this.quantity = quantity;
         this.unitPrice = unitPrice;
@@ -19,11 +19,11 @@ public class OrderItem {
     // Getters
     public String getItemName() { return itemName; }
     public int getQuantity() { return quantity; }
-    public double getUnitPrice() { return unitPrice; }
+    public int getUnitPrice() { return unitPrice; }
     public String getOrderFor() { return orderFor; }
 
     // 衍生屬性：計算該項目的小計金額
-    public double getSubtotal() {
+    public int getSubtotal() {
         return this.unitPrice * this.quantity;
     }
 }

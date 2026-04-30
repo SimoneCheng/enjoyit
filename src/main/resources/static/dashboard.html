@@ -95,6 +95,7 @@
             </div>
 
             <div class="btn-group">
+                <button class="action-btn" style="background: #ffa000;" onclick="adminAction('editAnnounce')">✏️ 編輯公告</button>
                 <button class="action-btn danger-btn" id="closeOrderBtn" onclick="adminAction('close')">🔒 結束團購</button>
                 <button class="action-btn success-btn" onclick="adminAction('summary')">📊 輸出訂單明細總表</button>
             </div>
@@ -206,18 +207,39 @@
     }
 
     async function adminAction(type) {
-        const password = prompt("請輸入管理者密碼：");
+        const adminPassword = prompt("請輸入管理者密碼：");
+
+        // 編輯公告
+        if (type === 'editAnnounce') {
+            const newAnnounce = prompt("請輸入新的公告內容：", document.getElementById('announcementText').textContent.replace('📢 公告：', ''));
+            if (newAnnounce === null) return;
+
+            const res = await fetch(`/api/group-orders/update-announcement/${currentOrderId}`, {
+                method: 'PUT',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ announcement: newAnnounce, adminPassword: adminPassword })
+            });
+
+            if (res.ok) {
+                alert("公告已更新！");
+                document.getElementById('announcementText').textContent = "📢 公告：" + newAnnounce;
+            } else {
+                alert("更新失敗：密碼錯誤或系統異常");
+            }
+            return;
+        }
 
         const res = await fetch('/api/group-orders/validate-admin', {
             method: 'POST',
             headers: {'Content-Type': 'application/json'},
             body: JSON.stringify({
                 orderId: currentOrderId,
-                password: password
+                adminPassword: adminPassword
             })
         });
 
-        if (res.ok || password === "2026") {
+        // 結束團購
+        if (res.ok || adminPassword === "2026") {
             if (type === 'close') {
                 const closeRes = await fetch(`/api/group-orders/close/${currentOrderId}`, {method: 'POST'});
                 if (closeRes.ok) {

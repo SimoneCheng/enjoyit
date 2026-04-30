@@ -21,8 +21,9 @@ public class GroupOrder {
 
         // 先預設訂單內有這三項商品
         this.orderItems.add(new OrderItem("大杯珍珠奶茶",2, 60, "預設奶茶"));
-        this.orderItems.add(new OrderItem("紅茶拿鐵", 1, 70, "預設紅茶拿鐵"));
-        this.orderItems.add(new OrderItem("四季春青茶", 3, 35, "預設青茶"));
+        this.orderItems.add(new OrderItem("紅茶拿鐵", 1, 70, "預設紅茶拿鐵1"));
+        this.orderItems.add(new OrderItem("四季春青茶", 1, 35, "預設青茶"));
+        this.orderItems.add(new OrderItem("紅茶拿鐵", 5, 70, "預設紅茶拿鐵2"));
     }
 
     /**
@@ -34,6 +35,16 @@ public class GroupOrder {
         if (newTime != null && newTime.isBefore(LocalDateTime.now())) {
             this.status = "已結單";
         }
+    }
+
+    // 編輯公告
+    public void updateAnnouncement(String newAnnouncement) {
+        this.announcement = newAnnouncement;
+    }
+
+    // 判斷管理者密碼是否正確
+    public boolean isPasswordCorrect(String input) {
+        return this.adminPassword.equals(input);
     }
 
     // Setters

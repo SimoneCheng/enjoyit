@@ -4,6 +4,7 @@ import com.enjoyit.domain.GroupOrder;
 import com.enjoyit.dto.DeadlineRequest;
 import com.enjoyit.service.OrderSummaryGenerator;
 import com.enjoyit.service.PasswordValidator;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import java.time.LocalDateTime;
@@ -90,13 +91,33 @@ public class GroupOrderController {
         }
     }
 
+    @PutMapping("/update-announcement/{orderId}")
+    public ResponseEntity<?> updateAnnouncement(
+            @PathVariable String orderId,
+            @RequestBody Map<String, String> request) {
+
+        GroupOrder order = ordersMap.get(orderId);
+        if (order == null) return ResponseEntity.badRequest().body("找不到該團購");
+
+        // 驗證管理員密碼 (對應 CO-09)
+        String inputPassword = request.get("adminPassword");
+        if (!order.isPasswordCorrect(inputPassword)) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("密碼錯誤");
+        }
+
+        String newAnnounce = request.get("announcement");
+        order.updateAnnouncement(newAnnounce); // 執行更新
+
+        return ResponseEntity.ok("公告更新成功");
+    }
+
     /**
      * CO-09: inputAdminPassword(adminPassword)
      * 驗證管理者密碼以取得管理權限
      */
     @PostMapping("/validate-admin")
     public ResponseEntity<?> inputAdminPassword(@RequestBody Map<String, String> request) {
-        String adminPassword = request.get("password");
+        String adminPassword = request.get("adminPassword");
 
         // 協調 PasswordValidator 進行驗證
         boolean isValid = passwordValidator.isValid(adminPassword, currentGroupOrder.getAdminPassword());
@@ -132,4 +153,5 @@ public class GroupOrderController {
         OrderSummaryGenerator generator = new OrderSummaryGenerator();
         return ResponseEntity.ok(generator.createSummary(currentGroupOrder.getOrderItems()));
     }
+
 }
