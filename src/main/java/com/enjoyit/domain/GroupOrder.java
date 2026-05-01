@@ -5,30 +5,28 @@ import java.util.ArrayList;
 import java.util.List;
 
 public class GroupOrder {
-    private String status;              // 團購狀態 (進行中/已結單)
-    private LocalDateTime deadline;     // 截止時間
-    private String adminPassword;      // 管理者密碼
-    private String announcement;       // 公告內容
+    private String status;
+    private LocalDateTime deadline;
+    private String adminPassword;
+    private String announcement;
     private List<OrderItem> orderItems = new ArrayList<>();
-    private String orderId;            // GroupOrder 唯一識別碼
+    private String orderId;
     private String orderInfo;
+    private String vendorId; // 【新增】綁定店家的 ID
 
     public GroupOrder(String info) {
-        this.orderInfo = info; // 確保名稱有存進去
-        this.status = "進行中";  // 設定初始狀態
-        // 生成管理者密碼，對應 CO-09
-        this.adminPassword = "pwd" + String.valueOf(System.currentTimeMillis()).substring(8);
-
-        // 先預設訂單內有這三項商品
-        this.orderItems.add(new OrderItem("大杯珍珠奶茶",1, 60, "預設"));
-        this.orderItems.add(new OrderItem("紅茶拿鐵", 1, 70, "預設"));
-        this.orderItems.add(new OrderItem("四季春青茶", 1, 35, "預設"));
+        this.orderInfo = info;
+        this.status = "進行中";
+        // ⚠️ 刪除原本的隨機密碼與那三杯預設飲料的假資料！
     }
 
-    /**
-     * 實作 CO-08 的領域邏輯
-     * 設定截止時間並根據目前時間判斷是否自動結單
-     */
+    // --- 新增與修改的 Getters & Setters ---
+    public String getVendorId() { return vendorId; }
+    public void setVendorId(String vendorId) { this.vendorId = vendorId; }
+
+    public void setAdminPassword(String adminPassword) { this.adminPassword = adminPassword; }
+    public String getAdminPassword() { return adminPassword; }
+
     public void setOrderDeadline(LocalDateTime newTime) {
         this.deadline = newTime;
         if (newTime.isBefore(LocalDateTime.now())) {
@@ -36,25 +34,12 @@ public class GroupOrder {
         }
     }
 
-    public void setAnnouncement(String announcement) {
-        this.announcement = announcement;
-    }
+    public void setAnnouncement(String announcement) { this.announcement = announcement; }
+    public void setStatus(String status) { this.status = status; }
+    public void setOrderInfo(String orderInfo) { this.orderInfo = orderInfo; }
+    public void setOrderId(String orderId) { this.orderId = orderId; }
 
-    public void setStatus(String status) {
-        this.status = status;
-    }
-
-    public void setOrderInfo(String orderInfo) {
-        this.orderInfo = orderInfo;
-    }
-
-    public void setOrderId(String orderId) {
-        this.orderId = orderId;
-    }
-
-    // Getters 供 Controller 或聚合器使用
     public String getStatus() { return status; }
-    public String getAdminPassword() { return adminPassword; }
     public List<OrderItem> getOrderItems() { return orderItems; }
     public String getOrderInfo() { return orderInfo; }
     public String getOrderId() { return orderId; }
