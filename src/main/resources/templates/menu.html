@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html lang="zh-TW" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="fragments/layout :: head('Enjoyit - 店家菜單管理')"></head>
+<body>
+<nav th:replace="fragments/layout :: navbar"></nav>
+
+<div class="main-layout">
+    <aside th:replace="fragments/layout :: sidebar('menu')"></aside>
+
+    <main class="content-area">
+        <section>
+            <h2>店家菜單編輯器</h2>
+            <div class="form-group">
+                <input type="text" id="vendorIdInput" value="vendor_001" readonly style="background-color: #eee;">
+            </div>
+            <div id="menu-container"></div>
+            <div class="form-group" style="display: flex; gap: 10px; align-items: center;">
+                <input type="text" id="newCategoryName" placeholder="輸入新分類名稱" style="flex: 1;">
+                <button class="action-btn" id="add-category-submit" style="white-space: nowrap;">+ 新增分類並發布</button>
+            </div>
+        </section>
+    </main>
+</div>
+
+<script th:src="@{/dashboard-base.js}"></script>
+<script th:src="@{/menu.js}"></script>
+</body>
+</html>

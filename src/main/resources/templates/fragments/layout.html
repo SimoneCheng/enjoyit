@@ -1,0 +1,21 @@
+<!DOCTYPE html>
+<html lang="zh-TW" xmlns:th="http://www.thymeleaf.org">
+<head th:fragment="head(title)">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title th:text="${title}">Enjoyit - 團購管理系統</title>
+    <link rel="stylesheet" th:href="@{/dashboard.css}">
+</head>
+<body>
+<nav class="navbar" th:fragment="navbar">
+    <div class="nav-brand">Enjoyit 飲揪eat</div>
+    <button class="logout-btn" onclick="localStorage.removeItem('groupId'); location.href='index.html'">登出</button>
+</nav>
+
+<aside class="sidebar" th:fragment="sidebar(active)">
+    <a class="menu-btn" th:classappend="${active} == 'publish' ? ' active'" th:href="@{/dashboard/publish}">🚀 發起團購</a>
+    <a class="menu-btn" th:classappend="${active} == 'menu' ? ' active'" th:href="@{/dashboard/menu}">📋 店家菜單管理</a>
+    <a class="menu-btn" th:classappend="${active} == 'orders' ? ' active'" th:href="@{/dashboard/orders}">🧾 團購訂單</a>
+</aside>
+</body>
+</html>

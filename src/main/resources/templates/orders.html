@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="zh-TW" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="fragments/layout :: head('Enjoyit - 團購訂單')"></head>
+<body>
+<nav th:replace="fragments/layout :: navbar"></nav>
+
+<div class="main-layout">
+    <aside th:replace="fragments/layout :: sidebar('orders')"></aside>
+
+    <main class="content-area">
+        <section>
+            <h2>團購訂單</h2>
+            <div class="sidebar-title">進行中的團購</div>
+            <div id="activeOrdersList"></div>
+            <div id="ordersEmpty" style="display:none; margin-top: 12px; color: #8e9196;">
+                尚無團購訂單，請先到「發起團購」建立。
+            </div>
+        </section>
+
+        <section id="orderDetailSection" style="margin-top: 20px; display:none;">
+            <h2 id="viewingOrderName">請選擇一筆團購</h2>
+
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                <div id="orderAnnouncementDisplay" style="color: #666; font-style: italic; padding: 10px; background: #fffde7; border-left: 4px solid #fdd835; flex: 1;"></div>
+                <div style="margin-left: 20px; font-weight: bold; color: var(--danger-color);" id="deadlineDisplay"></div>
+            </div>
+
+            <div style="background: #f9f9f9; padding: 15px; border-radius: 8px; margin-bottom: 20px;">
+                <h3 style="margin-top: 0; color: var(--primary-color);">🍔 參與者點餐區</h3>
+                <div id="dynamicOrderMenuContainer">
+                    載入菜單中...
+                </div>
+            </div>
+
+            <div class="btn-group">
+                <div style="flex: 1; display: flex; gap: 10px; align-items: center;">
+                    <input type="datetime-local" id="updateDeadlineInput" style="width: auto;">
+                    <button class="action-btn" style="background: #6c757d;" onclick="adminAction('deadline')">更新截止時間</button>
+                </div>
+                <button class="action-btn danger-btn" id="closeOrderBtn" onclick="adminAction('close')">🔒 結束團購</button>
+                <button class="action-btn success-btn" onclick="adminAction('summary')">📊 輸出訂單明細總表</button>
+            </div>
+            <div id="summaryResult" style="margin-top: 15px;"></div>
+        </section>
+    </main>
+</div>
+
+<script th:src="@{/dashboard-base.js}"></script>
+<script th:src="@{/orders.js}"></script>
+</body>
+</html>
