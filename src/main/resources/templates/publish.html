@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="zh-TW" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="fragments/layout :: head('Enjoyit - 發起團購')"></head>
+<body>
+<nav th:replace="fragments/layout :: navbar"></nav>
+
+<div class="main-layout">
+    <aside th:replace="fragments/layout :: sidebar('publish')"></aside>
+
+    <main class="content-area">
+        <section>
+            <h2>發起新團購</h2>
+            <div class="form-group">
+                <label>選擇綁定店家</label>
+                <select id="vendorSelect">
+                    <option value="vendor_001">測試店家 (vendor_001)</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label>設定管理者密碼</label>
+                <input type="password" id="adminPwdSetup" placeholder="未來結單與看明細需要此密碼">
+            </div>
+            <div class="form-group">
+                <label>團購名稱</label>
+                <input type="text" id="orderName" placeholder="例如：迷O夏大安店">
+            </div>
+            <div class="form-group">
+                <label>群組公告</label>
+                <textarea id="announcement" rows="3" placeholder="請輸入欲傳達給參與者的資訊..."></textarea>
+            </div>
+            <div class="form-group">
+                <label>設定截止時間 (選填)</label>
+                <input type="datetime-local" id="deadline">
+            </div>
+            <button class="action-btn" onclick="handlePublish()">確認發布</button>
+        </section>
+    </main>
+</div>
+
+<script th:src="@{/dashboard-base.js}"></script>
+<script th:src="@{/publish.js}"></script>
+</body>
+</html>

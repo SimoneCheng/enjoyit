@@ -115,7 +115,7 @@
                     showMessage(data.message, 'success');
                     // 延遲一小段時間讓使用者看見訊息後跳管理頁面
                     setTimeout(() => {
-                        window.location.href = 'dashboard.html?groupId=' + data.groupId;
+                        window.location.href = '/dashboard/publish?groupId=' + data.groupId;
                     }, 1000);
                 } else {
                     showMessage(data.error, 'error');

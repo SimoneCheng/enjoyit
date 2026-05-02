@@ -46,9 +46,7 @@
     <aside class="sidebar">
         <button class="menu-btn active" id="nav-publish" onclick="showSection('publish')">🚀 發起團購</button>
         <button class="menu-btn" id="nav-menu" onclick="showSection('menu')">📋 店家菜單管理</button>
-        <hr>
-        <div class="sidebar-title">進行中的團購</div>
-        <div id="activeOrdersList"></div>
+        <button class="menu-btn" id="nav-orders" onclick="showSection('orders')">🧾 團購訂單</button>
     </aside>
 
     <main class="content-area">
@@ -107,6 +105,13 @@
                 <button class="action-btn success-btn" onclick="adminAction('summary')">📊 輸出訂單明細總表</button>
             </div>
             <div id="summaryResult" style="margin-top: 15px;"></div>
+        </section>
+
+        <!-- 訂單列表區塊 -->
+        <section id="ordersSection" class="section-content">
+            <h2>團購訂單</h2>
+            <div class="sidebar-title">進行中的團購</div>
+            <div id="activeOrdersList"></div>
         </section>
 
         <!-- 菜單管理區塊 -->
@@ -216,6 +221,7 @@
     async function goToItemView(orderId) {
         currentOrderId = orderId;
         showSection('item');
+        document.getElementById('nav-orders').classList.add('active');
         document.getElementById('summaryResult').innerHTML = "";
         document.querySelectorAll('#activeOrdersList .menu-btn').forEach(btn => {
             btn.classList.toggle('active', btn.dataset.orderId === orderId);
