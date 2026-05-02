@@ -56,14 +56,14 @@
         <section id="publishSection" class="section-content active">
             <h2>發起新團購</h2>
             <div class="form-group">
-                <label>選擇綁定店家 (UC-03 關聯)</label>
+                <label>選擇綁定店家</label>
                 <!-- 實務上應從後端撈取店家列表，此處先給定選項 -->
                 <select id="vendorSelect">
                     <option value="vendor_001">測試店家 (vendor_001)</option>
                 </select>
             </div>
             <div class="form-group">
-                <label>設定管理者密碼 (UC-04 修復)</label>
+                <label>設定管理者密碼</label>
                 <input type="password" id="adminPwdSetup" placeholder="未來結單與看明細需要此密碼">
             </div>
             <div class="form-group">
@@ -103,20 +103,20 @@
                     <input type="datetime-local" id="updateDeadlineInput" style="width: auto;">
                     <button class="action-btn" style="background: #6c757d;" onclick="adminAction('deadline')">更新截止時間</button>
                 </div>
-                <button class="action-btn danger-btn" onclick="adminAction('close')">🔒 結束團購</button>
+                <button class="action-btn danger-btn" id="closeOrderBtn" onclick="adminAction('close')">🔒 結束團購</button>
                 <button class="action-btn success-btn" onclick="adminAction('summary')">📊 輸出訂單明細總表</button>
             </div>
             <div id="summaryResult" style="margin-top: 15px;"></div>
         </section>
 
-        <!-- 菜單管理區塊 (保持前一版不變) -->
+        <!-- 菜單管理區塊 -->
         <section id="menuSection" class="section-content">
             <h2>店家菜單編輯器</h2>
             <div class="form-group"><input type="text" id="vendorIdInput" value="vendor_001" readonly style="background-color: #eee;"></div>
             <div id="menu-container"></div>
-            <div class="btn-group">
-                <button class="action-btn" id="add-category-btn">+ 新增菜單分類</button>
-                <button class="action-btn success-btn" id="submit-menu-btn">發布菜單至系統</button>
+            <div class="form-group" style="display: flex; gap: 10px; align-items: center;">
+                <input type="text" id="newCategoryName" placeholder="輸入新分類名稱" style="flex: 1;">
+                <button class="action-btn" id="add-category-submit" style="white-space: nowrap;">+ 新增分類並發布</button>
             </div>
         </section>
     </main>
@@ -236,6 +236,17 @@
                 document.getElementById('deadlineDisplay').textContent = "截止時間：" + order.deadline.substring(0, 16).replace('T', ' ');
             } else {
                 document.getElementById('deadlineDisplay').textContent = "無截止時間";
+            }
+
+            const closeBtn = document.getElementById('closeOrderBtn');
+            if (order.status === '已結單') {
+                closeBtn.textContent = '團購已截止';
+                closeBtn.disabled = true;
+                closeBtn.classList.add('disabled');
+            } else {
+                closeBtn.textContent = '🔒 結束團購';
+                closeBtn.disabled = false;
+                closeBtn.classList.remove('disabled');
             }
 
             // 根據綁定的 vendorId 載入菜單
@@ -447,6 +458,7 @@
        ========================================= */
     class MenuEditor {
         constructor(vendorId) {
+            window.menuEditorInstance = this;
             this.vendorId = vendorId;
             this.menuData = { isActive: true, categories: [] };
             this.container = document.getElementById('menu-container');
@@ -474,11 +486,20 @@
         }
 
         initEventListeners() {
-            document.getElementById('add-category-btn').addEventListener('click', () => {
-                const catName = prompt("請輸入新分類名稱:");
-                if (catName && catName.trim() !== '') {
-                    this.menuData.categories.push({ name: catName.trim(), isActive: true, items: [] });
-                    this.render();
+            const addCategory = () => {
+                const input = document.getElementById('newCategoryName');
+                const catName = input.value.trim();
+                if (!catName) return;
+                this.menuData.categories.push({ name: catName, isActive: true, items: [] });
+                input.value = '';
+                this.render();
+                this.submitMenu({ silent: true });
+            };
+
+            document.getElementById('add-category-submit').addEventListener('click', addCategory);
+            document.getElementById('newCategoryName').addEventListener('keydown', (event) => {
+                if (event.key === 'Enter') {
+                    event.preventDefault();
                 }
             });
             document.getElementById('submit-menu-btn').addEventListener('click', () => this.submitMenu());
@@ -581,8 +602,12 @@
                         <div>
                             <button class="action-btn" style="background:#ffc107; color:black; padding:4px 8px; font-size:0.8rem;" onclick="window.menuEditorInstance.editCategory(${catIndex})">✏️ 修改</button>
                             <button class="action-btn" style="background:${category.isActive !== false ? '#dc3545' : '#28a745'}; padding:4px 8px; font-size:0.8rem;" onclick="window.menuEditorInstance.toggleCategoryStatus(${catIndex})">${category.isActive !== false ? '⬇️ 下架' : '⬆️ 上架'}</button>
-                            <button class="action-btn" style="padding: 4px 8px; font-size: 0.8rem;" onclick="window.menuEditorInstance.promptAddItem(${catIndex})">+ 新增品項</button>
                         </div>
+                    </div>
+                    <div style="display:flex; gap:10px; align-items:center; margin: 10px 0;">
+                        <input type="text" id="item-name-${catIndex}" placeholder="品項名稱" style="flex: 1;">
+                        <input type="number" id="item-price-${catIndex}" placeholder="價格" min="0" style="width: 120px;">
+                        <button class="action-btn" style="white-space: nowrap;" onclick="window.menuEditorInstance.addItem(${catIndex})">+ 新增品項並發布</button>
                     </div>
                 `;
 
@@ -631,27 +656,37 @@
             });
         }
 
-        promptAddItem(catIndex) {
-            const itemName = prompt("請輸入餐點名稱:");
-            if (!itemName) return;
-            const price = prompt("請輸入價格:");
-            if (price !== null && !isNaN(price) && parseInt(price) >= 0) {
-                this.menuData.categories[catIndex].items.push({
-                    id: "item_" + Date.now() + Math.floor(Math.random()*1000),
-                    name: itemName.trim(), unitPrice: parseInt(price), isActive: true, modifierGroups: []
-                });
-                this.render();
-            }
+        addItem(catIndex) {
+            const nameInput = document.getElementById(`item-name-${catIndex}`);
+            const priceInput = document.getElementById(`item-price-${catIndex}`);
+            const itemName = nameInput.value.trim();
+            const priceValue = priceInput.value.trim();
+            const price = parseInt(priceValue, 10);
+            if (!itemName || priceValue === '' || Number.isNaN(price) || price < 0) return;
+
+            this.menuData.categories[catIndex].items.push({
+                id: "item_" + Date.now() + Math.floor(Math.random() * 1000),
+                name: itemName,
+                unitPrice: price,
+                isActive: true,
+                modifierGroups: []
+            });
+            nameInput.value = '';
+            priceInput.value = '';
+            this.render();
+            this.submitMenu({ silent: true });
         }
 
-        async submitMenu() {
+        async submitMenu({ silent = false } = {}) {
             if (this.menuData.categories.length === 0) return alert("菜單不能為空！");
             try {
                 const response = await fetch(`/api/vendors/${this.vendorId}/menu/submit`, {
                     method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(this.menuData)
                 });
                 if (response.ok) {
-                    alert("✅ 菜單發布成功！已同步至所有團購活動。");
+                    if (!silent) {
+                        alert("✅ 菜單發布成功！已同步至所有團購活動。");
+                    }
                     this.loadMenuData();
                 } else { alert("發布失敗，請確認後端服務。"); }
             } catch (error) { alert("連線異常"); }
