@@ -4,7 +4,9 @@ import com.enjoyit.domain.Menu;
 import com.enjoyit.domain.MenuItem;
 import com.enjoyit.domain.Vendor;
 import com.enjoyit.repository.VendorRepository;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
+import org.springframework.web.server.ResponseStatusException;
 
 @Service
 public class MenuService {
@@ -16,12 +18,8 @@ public class MenuService {
 
     // 對應 Operation Contract: submitMenuCreation
     public void submitMenuCreation(String vendorId, Menu menu) {
-        // 如果找不到該店家，就自動幫他建一個 (解決預設資料為空的問題)
-        Vendor vendor = vendorRepository.findById(vendorId).orElseGet(() -> {
-            Vendor newVendor = new Vendor("測試店家");
-            newVendor.setId(vendorId); // 強制設為我們前端傳來的 vendor_001
-            return newVendor;
-        });
+        Vendor vendor = vendorRepository.findById(vendorId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "找不到該店家"));
 
         vendor.setMenu(menu);
 
@@ -31,14 +29,14 @@ public class MenuService {
     // 對應 Operation Contract: fetchMenuData
     public Menu fetchMenuData(String vendorId) {
         Vendor vendor = vendorRepository.findById(vendorId)
-                .orElseThrow(() -> new IllegalArgumentException("找不到該店家"));
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "找不到該店家"));
         return vendor.getMenu();
     }
 
     // 對應 Operation Contract: updateMenuItem (處理改價與上下架)
     public void updateMenuItem(String vendorId, String itemId, Integer newPrice, Boolean isActive) {
         Vendor vendor = vendorRepository.findById(vendorId)
-                .orElseThrow(() -> new IllegalArgumentException("找不到該店家"));
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "找不到該店家"));
 
         // 在菜單中尋找對應的 MenuItem
         MenuItem targetItem = null;
