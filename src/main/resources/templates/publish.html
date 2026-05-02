@@ -5,10 +5,10 @@
 <nav th:replace="fragments/layout :: navbar"></nav>
 
 <div class="main-layout">
-    <aside th:replace="fragments/layout :: sidebar('publish')"></aside>
+    <aside th:replace="fragments/layout :: sidebar('publish', 'classic')"></aside>
 
     <main class="content-area">
-        <section>
+        <section th:fragment="content">
             <h2>發起新團購</h2>
             <div class="form-group">
                 <label>選擇綁定店家</label>

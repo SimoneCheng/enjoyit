@@ -1,4 +1,7 @@
-window.onDashboardLoad = () => {};
+window.dashboardModules = window.dashboardModules || [];
+window.dashboardModules.push(() => {
+    // publish initialization if any
+});
 
 async function handlePublish() {
     const orderInfo = document.getElementById('orderName')?.value.trim();

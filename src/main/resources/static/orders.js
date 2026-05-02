@@ -1,9 +1,10 @@
 let currentOrderId = null;
 let currentVendorId = null;
 
-window.onDashboardLoad = () => {
+window.dashboardModules = window.dashboardModules || [];
+window.dashboardModules.push(() => {
     refreshList();
-};
+});
 
 async function refreshList() {
     const listDiv = document.getElementById('activeOrdersList');
