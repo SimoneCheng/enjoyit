@@ -263,3 +263,8 @@ async function adminAction(type) {
         }
     }
 }
+// 讓 Node.js (Jest) 可以載入此函式進行測試
+// 確保 goToItemView 也有被匯出
+if (typeof module !== 'undefined' && module.exports) {
+    module.exports = { submitOrderItem, adminAction, goToItemView };
+}
