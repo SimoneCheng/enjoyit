@@ -1,6 +1,7 @@
-window.onDashboardLoad = () => {
+window.dashboardModules = window.dashboardModules || [];
+window.dashboardModules.push(() => {
     window.menuEditorInstance = new MenuEditor('vendor_001');
-};
+});
 
 class MenuEditor {
     constructor(vendorId) {
@@ -33,11 +34,11 @@ class MenuEditor {
         const addCategory = () => {
             const input = document.getElementById('newCategoryName');
             const catName = input.value.trim();
-            if (!catName) return;
+            if (!catName) return alert('請輸入分類名稱');
             this.menuData.categories.push({ name: catName, isActive: true, items: [] });
             input.value = '';
             this.render();
-            this.submitMenu({ silent: true });
+            this.submitMenu({ silent: false });
         };
 
         document.getElementById('add-category-submit').addEventListener('click', addCategory);
@@ -203,7 +204,9 @@ class MenuEditor {
         const itemName = nameInput.value.trim();
         const priceValue = priceInput.value.trim();
         const price = parseInt(priceValue, 10);
-        if (!itemName || priceValue === '' || Number.isNaN(price) || price < 0) return;
+        
+        if (!itemName) return alert('請輸入品項名稱');
+        if (priceValue === '' || Number.isNaN(price) || price < 0) return alert('請輸入正確的金額');
 
         this.menuData.categories[catIndex].items.push({
             id: 'item_' + Date.now() + Math.floor(Math.random() * 1000),

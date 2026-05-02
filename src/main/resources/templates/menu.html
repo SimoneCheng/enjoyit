@@ -5,10 +5,10 @@
 <nav th:replace="fragments/layout :: navbar"></nav>
 
 <div class="main-layout">
-    <aside th:replace="fragments/layout :: sidebar('menu')"></aside>
+    <aside th:replace="fragments/layout :: sidebar('menu', 'classic')"></aside>
 
     <main class="content-area">
-        <section>
+        <section th:fragment="content">
             <h2>店家菜單編輯器</h2>
             <div class="form-group">
                 <input type="text" id="vendorIdInput" value="vendor_001" readonly style="background-color: #eee;">

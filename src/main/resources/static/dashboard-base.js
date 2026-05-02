@@ -16,9 +16,19 @@ function ensureLoggedIn() {
     return true;
 }
 
+// 用來存放各模組的初始化函式
+window.dashboardModules = window.dashboardModules || [];
+
 window.addEventListener('load', () => {
     if (!ensureLoggedIn()) return;
+    
+    // 如果有舊版的單一函式也執行
     if (typeof window.onDashboardLoad === 'function') {
         window.onDashboardLoad();
     }
+    
+    // 執行所有註冊模組的初始化
+    window.dashboardModules.forEach(fn => {
+        if (typeof fn === 'function') fn();
+    });
 });

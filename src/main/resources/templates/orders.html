@@ -5,10 +5,10 @@
 <nav th:replace="fragments/layout :: navbar"></nav>
 
 <div class="main-layout">
-    <aside th:replace="fragments/layout :: sidebar('orders')"></aside>
+    <aside th:replace="fragments/layout :: sidebar('orders', 'classic')"></aside>
 
     <main class="content-area">
-        <section>
+        <section th:fragment="list">
             <h2>團購訂單</h2>
             <div class="sidebar-title">進行中的團購</div>
             <div id="activeOrdersList"></div>
@@ -17,7 +17,7 @@
             </div>
         </section>
 
-        <section id="orderDetailSection" style="margin-top: 20px; display:none;">
+        <section id="orderDetailSection" style="margin-top: 20px; display:none;" th:fragment="detail">
             <h2 id="viewingOrderName">請選擇一筆團購</h2>
 
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
