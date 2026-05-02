@@ -13,16 +13,19 @@ public class GroupOrder {
     private String orderId;
     private String orderInfo;
     private String vendorId; // 【新增】綁定店家的 ID
+    private String groupId; // 綁定群組帳號
 
     public GroupOrder(String info) {
         this.orderInfo = info;
         this.status = "進行中";
-        // ⚠️ 刪除原本的隨機密碼與那三杯預設飲料的假資料！
     }
 
     // --- 新增與修改的 Getters & Setters ---
     public String getVendorId() { return vendorId; }
     public void setVendorId(String vendorId) { this.vendorId = vendorId; }
+
+    public String getGroupId() { return groupId; }
+    public void setGroupId(String groupId) { this.groupId = groupId; }
 
     public void setAdminPassword(String adminPassword) { this.adminPassword = adminPassword; }
     public String getAdminPassword() { return adminPassword; }

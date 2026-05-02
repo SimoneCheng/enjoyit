@@ -39,7 +39,7 @@
 
 <nav class="navbar">
     <div class="nav-brand">Enjoyit 飲揪eat</div>
-    <button class="logout-btn" onclick="location.href='index.html'">登出</button>
+    <button class="logout-btn" onclick="localStorage.removeItem('groupId'); location.href='index.html'">登出</button>
 </nav>
 
 <div class="main-layout">
@@ -125,8 +125,21 @@
 <script>
     let currentOrderId = null;
     let currentVendorId = null;
+    const currentGroupId = (() => {
+        const params = new URLSearchParams(window.location.search);
+        const groupId = params.get('groupId') || localStorage.getItem('groupId');
+        if (groupId) {
+            localStorage.setItem('groupId', groupId);
+        }
+        return groupId;
+    })();
 
     window.onload = () => {
+        if (!currentGroupId) {
+            alert('請先登入群組');
+            location.href = 'index.html';
+            return;
+        }
         refreshList();
         window.menuEditorInstance = new MenuEditor("vendor_001");
     };
@@ -141,15 +154,19 @@
 
     async function refreshList() {
         try {
-            const res = await fetch('/api/group-orders/all');
+            const res = await fetch(`/api/group-orders/all?groupId=${encodeURIComponent(currentGroupId)}`);
             const orders = await res.json();
             const listDiv = document.getElementById('activeOrdersList');
             listDiv.innerHTML = '';
             orders.forEach(order => {
                 const btn = document.createElement('div');
                 btn.className = 'menu-btn';
+                btn.dataset.orderId = order.orderId;
                 btn.innerHTML = `${order.status === '已結單' ? '🔒' : '🥤'} ${order.orderInfo}`;
                 btn.onclick = () => goToItemView(order.orderId);
+                if (currentOrderId === order.orderId) {
+                    btn.classList.add('active');
+                }
                 listDiv.appendChild(btn);
             });
         } catch (e) { console.error("Refresh list failed"); }
@@ -163,12 +180,13 @@
         const deadline = document.getElementById('deadline').value;
 
         if(!orderInfo || !adminPassword) return alert("請輸入團購名稱與管理者密碼！");
+        if(!currentGroupId) return alert("缺少群組資訊，請重新登入");
 
         try {
             const res = await fetch('/api/group-orders/publish', {
                 method: 'POST',
                 headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({ orderInfo, announcement, vendorId, adminPassword })
+                body: JSON.stringify({ orderInfo, announcement, vendorId, adminPassword, groupId: currentGroupId })
             });
 
             if(res.ok) {
@@ -176,7 +194,7 @@
 
                 // 👇 重點修正這裡：在網址後方加上 ?password=...
                 if (deadline) {
-                    await fetch(`/api/group-orders/${orderId}/deadline?password=${encodeURIComponent(adminPassword)}`, {
+                    await fetch(`/api/group-orders/${orderId}/deadline?groupId=${encodeURIComponent(currentGroupId)}&password=${encodeURIComponent(adminPassword)}`, {
                         method: 'PUT',
                         headers: {'Content-Type': 'application/json'},
                         body: JSON.stringify({ deadline })
@@ -199,10 +217,13 @@
         currentOrderId = orderId;
         showSection('item');
         document.getElementById('summaryResult').innerHTML = "";
+        document.querySelectorAll('#activeOrdersList .menu-btn').forEach(btn => {
+            btn.classList.toggle('active', btn.dataset.orderId === orderId);
+        });
 
         try {
             // 抓取該筆訂單的完整資訊
-            const res = await fetch(`/api/group-orders/${orderId}`);
+            const res = await fetch(`/api/group-orders/${orderId}?groupId=${encodeURIComponent(currentGroupId)}`);
             if(!res.ok) return;
             const order = await res.json();
             currentVendorId = order.vendorId;
@@ -342,7 +363,7 @@
         };
 
         try {
-            const res = await fetch(`/api/group-orders/${currentOrderId}/items`, {
+            const res = await fetch(`/api/group-orders/${currentOrderId}/items?groupId=${encodeURIComponent(currentGroupId)}`, {
                 method: 'POST',
                 headers: {'Content-Type': 'application/json'},
                 body: JSON.stringify(orderItemJson)
@@ -362,7 +383,7 @@
         if (!password) return;
 
         if (type === 'close') {
-            const res = await fetch(`/api/group-orders/close/${currentOrderId}`, {
+            const res = await fetch(`/api/group-orders/close/${currentOrderId}?groupId=${encodeURIComponent(currentGroupId)}`, {
                 method: 'POST',
                 headers: {'Content-Type': 'application/json'},
                 body: JSON.stringify({ password: password })
@@ -375,7 +396,7 @@
                 alert(await res.text());
             }
         } else if (type === 'summary') {
-            const res = await fetch(`/api/group-orders/${currentOrderId}/summary?password=${encodeURIComponent(password)}`);
+            const res = await fetch(`/api/group-orders/${currentOrderId}/summary?groupId=${encodeURIComponent(currentGroupId)}&password=${encodeURIComponent(password)}`);
             if (res.ok) {
                 const data = await res.json();
                 document.getElementById('summaryResult').innerHTML = `
@@ -391,7 +412,7 @@
             const newDeadline = document.getElementById('updateDeadlineInput').value;
             if(!newDeadline) return alert('請先選擇時間');
 
-            const res = await fetch(`/api/group-orders/${currentOrderId}/deadline?password=${encodeURIComponent(password)}`, {
+            const res = await fetch(`/api/group-orders/${currentOrderId}/deadline?groupId=${encodeURIComponent(currentGroupId)}&password=${encodeURIComponent(password)}`, {
                 method: 'PUT',
                 headers: {'Content-Type': 'application/json'},
                 body: JSON.stringify({ deadline: newDeadline })
@@ -407,7 +428,7 @@
 
     async function fetchSummary() {
         // 【修改這裡】網址加上 currentOrderId
-        const res = await fetch(`/api/group-orders/${currentOrderId}/summary`);
+        const res = await fetch(`/api/group-orders/${currentOrderId}/summary?groupId=${encodeURIComponent(currentGroupId)}`);
         if(res.ok) {
             const data = await res.json();
             document.getElementById('summaryResult').innerHTML = `
