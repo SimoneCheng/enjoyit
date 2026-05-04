@@ -240,3 +240,7 @@ class MenuEditor {
         }
     }
 }
+// 讓 Node.js (Jest) 可以載入此函式進行測試
+if (typeof module !== 'undefined' && module.exports) {
+    module.exports = { MenuEditor };
+}

@@ -44,3 +44,11 @@ async function handlePublish() {
         alert('連線異常');
     }
 }
+
+// 為了讓 Jest 能夠載入並測試這些函式
+if (typeof module !== 'undefined' && module.exports) {
+    // 依據不同檔案匯出對應的函式
+    // 在 publish.js 加上： module.exports = { handlePublish };
+    // 在 dashboard-base.js 加上： module.exports = { ensureLoggedIn };
+    module.exports = { handlePublish };
+}

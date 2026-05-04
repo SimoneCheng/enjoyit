@@ -44,4 +44,7 @@ public class MenuItem {
     public boolean isActive() { return isActive; }
     public void setActive(boolean active) { isActive = active; }
     public List<ModifierGroup> getModifierGroups() { return modifierGroups; }
+    public void setId(String id) {
+        this.id = id;
+    }
 }

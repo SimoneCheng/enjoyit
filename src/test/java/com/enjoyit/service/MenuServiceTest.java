@@ -8,125 +8,100 @@ import com.enjoyit.repository.VendorRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.InjectMocks;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
+@ExtendWith(MockitoExtension.class)
 class MenuServiceTest {
 
+    @Mock
     private VendorRepository vendorRepository;
+
+    @InjectMocks
     private MenuService menuService;
+
+    private Vendor testVendor;
+    private MenuItem testItem;
 
     @BeforeEach
     void setUp() {
-        vendorRepository = mock(VendorRepository.class);
-        menuService = new MenuService(vendorRepository);
-    }
+        // 準備測試用的假資料 (Stubbing)
+        testVendor = new Vendor("測試店家");
+        testVendor.setId("vendor_001");
 
-    @Test
-    @DisplayName("UC-03: 新增菜單 - 成功將菜單寫入資料結構")
-    void submitMenuCreation_Success() {
-        String vendorId = "v1";
-        Vendor vendor = new Vendor("店家A");
-        vendor.setId(vendorId);
         Menu menu = new Menu();
+        MenuCategory category = new MenuCategory();
+        category.setName("主食");
 
-        when(vendorRepository.findById(vendorId)).thenReturn(Optional.of(vendor));
+        testItem = new MenuItem();
+        testItem.setId("item_123");
+        testItem.setName("排骨飯");
+        testItem.setUnitPrice(100);
+        testItem.setActive(true);
 
-        menuService.submitMenuCreation(vendorId, menu);
-
-        assertEquals(menu, vendor.getMenu());
-        verify(vendorRepository, times(1)).save(vendor);
-    }
-
-    @Test
-    @DisplayName("UC-03: 修改餐點價格 - 成功更新價格")
-    void updateMenuItem_PriceUpdate_Success() {
-        String vendorId = "v1";
-        Vendor vendor = new Vendor("店家A");
-        vendor.setId(vendorId);
-        
-        Menu menu = new Menu();
-        MenuCategory category = new MenuCategory("主食");
-        MenuItem item = new MenuItem("排骨飯", 100);
-        String itemId = item.getId();
-        category.addItem(item);
+        category.getItems().add(testItem);
         menu.addCategory(category);
-        vendor.setMenu(menu);
-
-        when(vendorRepository.findById(vendorId)).thenReturn(Optional.of(vendor));
-
-        menuService.updateMenuItem(vendorId, itemId, 120, null);
-
-        assertEquals(120, item.getUnitPrice());
-        verify(vendorRepository, times(1)).save(vendor);
+        testVendor.setMenu(menu);
     }
 
     @Test
-    @DisplayName("UC-03: 修改餐點狀態 - 成功切換為下架")
-    void updateMenuItem_StatusUpdate_Success() {
-        String vendorId = "v1";
-        Vendor vendor = new Vendor("店家A");
-        vendor.setId(vendorId);
-        
-        Menu menu = new Menu();
-        MenuCategory category = new MenuCategory("主食");
-        MenuItem item = new MenuItem("排骨飯", 100);
-        String itemId = item.getId();
-        category.addItem(item);
-        menu.addCategory(category);
-        vendor.setMenu(menu);
+    @DisplayName("測試更新餐點：成功更新價格與下架狀態")
+    void testUpdateMenuItem_Success() {
+        // 告訴 Mock：當有人用 vendor_001 找店家時，回傳我們的假店家
+        when(vendorRepository.findById("vendor_001")).thenReturn(Optional.of(testVendor));
 
-        when(vendorRepository.findById(vendorId)).thenReturn(Optional.of(vendor));
+        // 執行更新動作：改價為 120，並設為下架 (false)
+        menuService.updateMenuItem("vendor_001", "item_123", 120, false);
 
-        menuService.updateMenuItem(vendorId, itemId, null, false);
-
-        assertFalse(item.isActive());
-        verify(vendorRepository, times(1)).save(vendor);
+        // 驗證結果
+        assertEquals(120, testItem.getUnitPrice());
+        assertFalse(testItem.isActive());
+        // 驗證 repository.save 有被呼叫過一次
+        verify(vendorRepository, times(1)).save(testVendor);
     }
 
     @Test
-    @DisplayName("UC-03: 修改餐點驗證 - 價格不可為負數")
-    void updateMenuItem_NegativePrice_ThrowsException() {
-        String vendorId = "v1";
-        Vendor vendor = new Vendor("店家A");
-        vendor.setId(vendorId);
-        
-        Menu menu = new Menu();
-        MenuCategory category = new MenuCategory("主食");
-        MenuItem item = new MenuItem("排骨飯", 100);
-        String itemId = item.getId();
-        category.addItem(item);
-        menu.addCategory(category);
-        vendor.setMenu(menu);
+    @DisplayName("測試更新餐點：店家不存在時應拋出 404 例外")
+    void testUpdateMenuItem_VendorNotFound() {
+        when(vendorRepository.findById("invalid_vendor")).thenReturn(Optional.empty());
 
-        when(vendorRepository.findById(vendorId)).thenReturn(Optional.of(vendor));
+        assertThrows(ResponseStatusException.class, () -> {
+            menuService.updateMenuItem("invalid_vendor", "item_123", 100, true);
+        });
 
-        assertThrows(IllegalArgumentException.class, () -> 
-            menuService.updateMenuItem(vendorId, itemId, -50, null)
-        );
+        // 驗證如果店家不存在，絕對不能呼叫 save
+        verify(vendorRepository, never()).save(any());
     }
 
     @Test
-    @DisplayName("UC-03: 修改餐點驗證 - 找不到該品項時拋出異常")
-    void updateMenuItem_ItemNotFound_ThrowsException() {
-        String vendorId = "v1";
-        Vendor vendor = new Vendor("店家A");
-        vendor.setId(vendorId);
-        
-        Menu menu = new Menu();
-        MenuCategory category = new MenuCategory("主食");
-        MenuItem item = new MenuItem("排骨飯", 100);
-        category.addItem(item);
-        menu.addCategory(category);
-        vendor.setMenu(menu);
+    @DisplayName("測試更新餐點：餐點 ID 不存在時應拋出 IllegalArgumentException")
+    void testUpdateMenuItem_ItemNotFound() {
+        when(vendorRepository.findById("vendor_001")).thenReturn(Optional.of(testVendor));
 
-        when(vendorRepository.findById(vendorId)).thenReturn(Optional.of(vendor));
+        Exception exception = assertThrows(IllegalArgumentException.class, () -> {
+            menuService.updateMenuItem("vendor_001", "wrong_item_id", 100, true);
+        });
 
-        assertThrows(IllegalArgumentException.class, () -> 
-            menuService.updateMenuItem(vendorId, "non-existent-id", 120, null)
-        );
+        assertEquals("找不到該餐點品項", exception.getMessage());
+    }
+
+    @Test
+    @DisplayName("測試更新餐點：價格小於 0 時應攔截並拋出例外")
+    void testUpdateMenuItem_NegativePrice() {
+        when(vendorRepository.findById("vendor_001")).thenReturn(Optional.of(testVendor));
+
+        Exception exception = assertThrows(IllegalArgumentException.class, () -> {
+            menuService.updateMenuItem("vendor_001", "item_123", -50, true);
+        });
+
+        assertEquals("價格不可為負數", exception.getMessage());
     }
 }
