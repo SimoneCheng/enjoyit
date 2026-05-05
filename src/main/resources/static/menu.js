@@ -49,16 +49,26 @@ class MenuEditor {
         });
     }
 
-    toggleMenuStatus() { this.menuData.isActive = !this.menuData.isActive; this.render(); }
+    toggleMenuStatus() {
+        this.menuData.isActive = !this.menuData.isActive;
+        this.render();
+        this.submitMenu({ silent: true });
+    }
 
     editCategory(catIndex) {
         const cat = this.menuData.categories[catIndex];
         const newName = prompt('修改分類名稱:', cat.name);
-        if (newName && newName.trim() !== '') { cat.name = newName.trim(); this.render(); }
+        if (newName && newName.trim() !== '') {
+            cat.name = newName.trim();
+            this.render();
+            this.submitMenu({ silent: true });
+        }
     }
     toggleCategoryStatus(catIndex) {
         const cat = this.menuData.categories[catIndex];
-        cat.isActive = !cat.isActive; this.render();
+        cat.isActive = !cat.isActive;
+        this.render();
+        this.submitMenu({ silent: true });
     }
 
     editItem(catIndex, itemIndex) {
@@ -67,13 +77,17 @@ class MenuEditor {
         if (!newName) return;
         const newPrice = prompt('修改價格:', item.unitPrice);
         if (newPrice !== null && !isNaN(newPrice) && parseInt(newPrice, 10) >= 0) {
-            item.name = newName.trim(); item.unitPrice = parseInt(newPrice, 10);
+            item.name = newName.trim();
+            item.unitPrice = parseInt(newPrice, 10);
             this.render();
+            this.submitMenu({ silent: true });
         }
     }
     toggleItemStatus(catIndex, itemIndex) {
         const item = this.menuData.categories[catIndex].items[itemIndex];
-        item.isActive = !item.isActive; this.render();
+        item.isActive = !item.isActive;
+        this.render();
+        this.submitMenu({ silent: true });
     }
 
     promptAddModifier(catIndex, itemIndex) {
@@ -92,16 +106,23 @@ class MenuEditor {
             }
             group.options.push({ name: optionName.trim(), extraPrice: parseInt(price, 10) });
             this.render();
+            this.submitMenu({ silent: true });
         }
     }
     editModifierGroup(catIndex, itemIndex, mgIndex) {
         const mg = this.menuData.categories[catIndex].items[itemIndex].modifierGroups[mgIndex];
         const newName = prompt('修改群組名稱:', mg.name);
-        if (newName && newName.trim() !== '') { mg.name = newName.trim(); this.render(); }
+        if (newName && newName.trim() !== '') {
+            mg.name = newName.trim();
+            this.render();
+            this.submitMenu({ silent: true });
+        }
     }
     toggleModifierGroupStatus(catIndex, itemIndex, mgIndex) {
         const mg = this.menuData.categories[catIndex].items[itemIndex].modifierGroups[mgIndex];
-        mg.isActive = !mg.isActive; this.render();
+        mg.isActive = !mg.isActive;
+        this.render();
+        this.submitMenu({ silent: true });
     }
     editModifierOption(catIndex, itemIndex, mgIndex, optIndex) {
         const opt = this.menuData.categories[catIndex].items[itemIndex].modifierGroups[mgIndex].options[optIndex];
@@ -109,8 +130,10 @@ class MenuEditor {
         if (!newName) return;
         const newPrice = prompt('修改加價金額:', opt.extraPrice);
         if (newPrice !== null && !isNaN(newPrice) && parseInt(newPrice, 10) >= 0) {
-            opt.name = newName.trim(); opt.extraPrice = parseInt(newPrice, 10);
+            opt.name = newName.trim();
+            opt.extraPrice = parseInt(newPrice, 10);
             this.render();
+            this.submitMenu({ silent: true });
         }
     }
 
