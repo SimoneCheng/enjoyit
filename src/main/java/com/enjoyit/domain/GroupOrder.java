@@ -34,6 +34,8 @@ public class GroupOrder {
         this.deadline = newTime;
         if (newTime.isBefore(LocalDateTime.now())) {
             this.status = "已結單";
+        } else {
+            this.status = "進行中";
         }
     }
 

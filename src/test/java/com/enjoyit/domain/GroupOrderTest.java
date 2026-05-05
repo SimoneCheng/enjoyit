@@ -40,4 +40,19 @@ class GroupOrderTest {
         assertEquals(pastTime, order.getDeadline());
         assertEquals("已結單", order.getStatus());
     }
+
+    @Test
+    @DisplayName("測試更新截止時間為未來，已結單狀態應變更回進行中")
+    void testUpdateDeadlineFromPastToFuture_ShouldReopen() {
+        GroupOrder order = new GroupOrder("測試團購");
+        LocalDateTime pastTime = LocalDateTime.now().minusHours(1); // 一小時前
+        order.setOrderDeadline(pastTime);
+        assertEquals("已結單", order.getStatus()); // 確認已結單
+
+        LocalDateTime futureTime = LocalDateTime.now().plusDays(1); // 明天
+        order.setOrderDeadline(futureTime);
+        
+        assertEquals(futureTime, order.getDeadline());
+        assertEquals("進行中", order.getStatus()); // 確認變回進行中
+    }
 }
