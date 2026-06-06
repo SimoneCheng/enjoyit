@@ -1,6 +1,8 @@
 package com.enjoyit.service;
 
 import com.enjoyit.domain.OrderItem;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -27,5 +29,45 @@ public class OrderSummaryGenerator {
                         },
                         Collectors.summingInt(OrderItem::getQuantity)
                 ));
+    }
+
+    public Map<String, Object> createDetailedSummary(List<OrderItem> items) {
+        Map<String, Integer> aggregatedItems = createSummary(items);
+        Map<String, Integer> amountByOrderFor = new LinkedHashMap<>();
+        Map<String, List<Map<String, Object>>> submittedByParticipant = new LinkedHashMap<>();
+
+        for (OrderItem item : items) {
+            String orderFor = safeName(item.getOrderFor());
+            amountByOrderFor.merge(orderFor, item.getOrderTotalPrice(), Integer::sum);
+
+            String participantId = safeName(item.getParticipantId());
+            List<Map<String, Object>> participantItems = submittedByParticipant.computeIfAbsent(
+                    participantId,
+                    ignored -> new ArrayList<>()
+            );
+
+            Map<String, Object> record = new LinkedHashMap<>();
+            record.put("orderFor", orderFor);
+            record.put("itemName", item.getItemName());
+            record.put("quantity", item.getQuantity());
+            record.put("orderTotalPrice", item.getOrderTotalPrice());
+            record.put("customizations", item.getCustomizations());
+            participantItems.add(record);
+        }
+
+        Map<String, Object> summary = new LinkedHashMap<>();
+        summary.put("aggregatedItems", aggregatedItems);
+        summary.put("amountByOrderFor", amountByOrderFor);
+        summary.put("submittedByParticipant", submittedByParticipant);
+        summary.put("totalQuantity", items.stream().mapToInt(OrderItem::getQuantity).sum());
+        summary.put("totalAmount", items.stream().mapToInt(OrderItem::getOrderTotalPrice).sum());
+        return summary;
+    }
+
+    private String safeName(String value) {
+        if (value == null || value.trim().isEmpty()) {
+            return "未命名";
+        }
+        return value.trim();
     }
 }

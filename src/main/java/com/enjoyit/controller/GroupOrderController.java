@@ -1,6 +1,7 @@
 package com.enjoyit.controller;
 
 import com.enjoyit.domain.GroupOrder;
+import com.enjoyit.dto.OrderItemsBatchRequest;
 import com.enjoyit.dto.DeadlineRequest;
 import com.enjoyit.service.OrderSummaryGenerator;
 import com.enjoyit.service.PasswordValidator;
@@ -11,6 +12,7 @@ import org.springframework.web.server.ResponseStatusException;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
+import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 
@@ -71,12 +73,90 @@ public class GroupOrderController {
             @RequestParam String groupId,
             @RequestBody com.enjoyit.domain.OrderItem item) {
         GroupOrder order = requireOrder(orderId, groupId);
-        if ("已結單".equals(order.getStatus())) {
-            return ResponseEntity.badRequest().body("此團購已截止，無法點餐");
+        String closedMessage = getClosedOrderMessage(order);
+        if (closedMessage != null) {
+            return ResponseEntity.badRequest().body(closedMessage);
+        }
+        String validationMessage = validateOrderItem(item);
+        if (validationMessage != null) {
+            return ResponseEntity.badRequest().body(validationMessage);
         }
 
         order.getOrderItems().add(item);
-        return ResponseEntity.ok("餐點新增成功");
+        return ResponseEntity.ok(item);
+    }
+
+    @PostMapping("/{orderId}/items/batch")
+    public ResponseEntity<?> addOrderItemsBatch(
+            @PathVariable String orderId,
+            @RequestParam String groupId,
+            @RequestBody OrderItemsBatchRequest request) {
+        GroupOrder order = requireOrder(orderId, groupId);
+        String closedMessage = getClosedOrderMessage(order);
+        if (closedMessage != null) {
+            return ResponseEntity.badRequest().body(closedMessage);
+        }
+        if (request == null || request.getItems() == null || request.getItems().isEmpty()) {
+            return ResponseEntity.badRequest().body("待送出的餐點不能為空");
+        }
+
+        for (com.enjoyit.domain.OrderItem item : request.getItems()) {
+            String validationMessage = validateOrderItem(item);
+            if (validationMessage != null) {
+                return ResponseEntity.badRequest().body(validationMessage);
+            }
+        }
+
+        order.getOrderItems().addAll(request.getItems());
+        return ResponseEntity.ok(request.getItems());
+    }
+
+    @PutMapping("/{orderId}/items/{itemId}")
+    public ResponseEntity<?> updateOrderItem(
+            @PathVariable String orderId,
+            @PathVariable String itemId,
+            @RequestParam String groupId,
+            @RequestBody com.enjoyit.domain.OrderItem updatedItem) {
+        GroupOrder order = requireOrder(orderId, groupId);
+        String closedMessage = getClosedOrderMessage(order);
+        if (closedMessage != null) {
+            return ResponseEntity.badRequest().body(closedMessage);
+        }
+        String validationMessage = validateOrderItem(updatedItem);
+        if (validationMessage != null) {
+            return ResponseEntity.badRequest().body(validationMessage);
+        }
+
+        com.enjoyit.domain.OrderItem existingItem = findOrderItem(order.getOrderItems(), itemId);
+        updatedItem.setParticipantId(updatedItem.getParticipantId().trim());
+        updatedItem.setOrderFor(updatedItem.getOrderFor().trim());
+        updatedItem.setItemName(updatedItem.getItemName().trim());
+
+        existingItem.setParticipantId(updatedItem.getParticipantId());
+        existingItem.setOrderFor(updatedItem.getOrderFor());
+        existingItem.setMenuItemId(updatedItem.getMenuItemId());
+        existingItem.setItemName(updatedItem.getItemName());
+        existingItem.setUnitPrice(updatedItem.getUnitPrice());
+        existingItem.setCustomizations(updatedItem.getCustomizations());
+        existingItem.setQuantity(updatedItem.getQuantity());
+        existingItem.setOrderTotalPrice(updatedItem.getOrderTotalPrice());
+        return ResponseEntity.ok(existingItem);
+    }
+
+    @DeleteMapping("/{orderId}/items/{itemId}")
+    public ResponseEntity<?> deleteOrderItem(
+            @PathVariable String orderId,
+            @PathVariable String itemId,
+            @RequestParam String groupId) {
+        GroupOrder order = requireOrder(orderId, groupId);
+        String closedMessage = getClosedOrderMessage(order);
+        if (closedMessage != null) {
+            return ResponseEntity.badRequest().body(closedMessage);
+        }
+
+        com.enjoyit.domain.OrderItem existingItem = findOrderItem(order.getOrderItems(), itemId);
+        order.getOrderItems().remove(existingItem);
+        return ResponseEntity.ok("餐點已取消");
     }
 
     // 供左側列表讀取所有團購
@@ -143,8 +223,15 @@ public class GroupOrderController {
     }
 
     @PostMapping("/close/{orderId}")
-    public ResponseEntity<?> closeOrder(@PathVariable String orderId, @RequestParam String groupId) {
+    public ResponseEntity<?> closeOrder(
+            @PathVariable String orderId,
+            @RequestParam String groupId,
+            @RequestBody(required = false) Map<String, String> request) {
         GroupOrder order = requireOrder(orderId, groupId);
+        String password = request == null ? null : request.get("password");
+        if (!passwordValidator.isValid(password, order.getAdminPassword())) {
+            return ResponseEntity.status(401).body("密碼錯誤，權限不足");
+        }
         order.setStatus("已結單");
         return ResponseEntity.ok("訂單已成功結單");
     }
@@ -153,15 +240,21 @@ public class GroupOrderController {
      * CO-10: downloadOrderSummary (升級版：針對特定 orderId 產出總表)
      */
     @GetMapping("/{orderId}/summary")
-    public ResponseEntity<?> downloadOrderSummary(@PathVariable String orderId, @RequestParam String groupId) {
+    public ResponseEntity<?> downloadOrderSummary(
+            @PathVariable String orderId,
+            @RequestParam String groupId,
+            @RequestParam(required = false) String password) {
         GroupOrder order = requireOrder(orderId, groupId);
+        if (!passwordValidator.isValid(password, order.getAdminPassword())) {
+            return ResponseEntity.status(401).body("密碼錯誤，權限不足");
+        }
 
         if (!"已結單".equals(order.getStatus())) {
             return ResponseEntity.badRequest().body("Error: Order not closed");
         }
 
         OrderSummaryGenerator generator = new OrderSummaryGenerator();
-        return ResponseEntity.ok(generator.createSummary(order.getOrderItems()));
+        return ResponseEntity.ok(generator.createDetailedSummary(order.getOrderItems()));
     }
 
     private GroupOrder requireOrder(String orderId, String groupId) {
@@ -173,5 +266,44 @@ public class GroupOrderController {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "找不到該訂單");
         }
         return order;
+    }
+
+    private String getClosedOrderMessage(GroupOrder order) {
+        if ("已結單".equals(order.getStatus())) {
+            return "此團購已截止，無法點餐";
+        }
+        return null;
+    }
+
+    private String validateOrderItem(com.enjoyit.domain.OrderItem item) {
+        if (item == null) {
+            return "缺少餐點資料";
+        }
+        if (item.getParticipantId() == null || item.getParticipantId().trim().isEmpty()) {
+            return "缺少操作裝置識別";
+        }
+        if (item.getOrderFor() == null || item.getOrderFor().trim().isEmpty()) {
+            return "請輸入訂購人姓名";
+        }
+        if (item.getItemName() == null || item.getItemName().trim().isEmpty()) {
+            return "缺少餐點名稱";
+        }
+        if (item.getQuantity() <= 0) {
+            return "數量必須至少 1 份";
+        }
+        if (item.getUnitPrice() < 0 || item.getOrderTotalPrice() < 0) {
+            return "金額不可為負數";
+        }
+        if (item.getCustomizations() == null) {
+            item.setCustomizations(new java.util.ArrayList<>());
+        }
+        return null;
+    }
+
+    private com.enjoyit.domain.OrderItem findOrderItem(List<com.enjoyit.domain.OrderItem> orderItems, String itemId) {
+        return orderItems.stream()
+                .filter(item -> itemId.equals(item.getItemID()))
+                .findFirst()
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "找不到該餐點"));
     }
 }
