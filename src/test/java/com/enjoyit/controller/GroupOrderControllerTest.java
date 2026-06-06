@@ -15,14 +15,22 @@ import java.util.Map;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
+import org.mockito.Mockito;
+import static org.mockito.ArgumentMatchers.*;
+import static org.mockito.Mockito.when;
+import com.enjoyit.service.GroupOrderService;
+import com.enjoyit.domain.GroupOrder;
+import java.util.Optional;
+
 class GroupOrderControllerTest {
 
     private MockMvc mockMvc;
     private ObjectMapper objectMapper = new ObjectMapper();
+    private GroupOrderService groupOrderService = Mockito.mock(GroupOrderService.class);
 
     @BeforeEach
     void setUp() {
-        mockMvc = MockMvcBuilders.standaloneSetup(new GroupOrderController())
+        mockMvc = MockMvcBuilders.standaloneSetup(new GroupOrderController(groupOrderService))
                 // 👇 直接抽換底層的訊息轉換器
                 .setMessageConverters(
                         new StringHttpMessageConverter(StandardCharsets.UTF_8),
