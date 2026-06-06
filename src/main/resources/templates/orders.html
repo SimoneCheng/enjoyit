@@ -27,9 +27,33 @@
 
             <div style="background: #f9f9f9; padding: 15px; border-radius: 8px; margin-bottom: 20px;">
                 <h3 style="margin-top: 0; color: var(--primary-color);">🍔 參與者點餐區</h3>
+                <p style="margin-top: 0; color: #666;">
+                    所有人共用同一個團購群組帳號，因此每筆餐點都必須填寫實際訂購人的姓名。本人訂或代訂都走同一個流程。
+                </p>
                 <div id="dynamicOrderMenuContainer">
                     載入菜單中...
                 </div>
+            </div>
+
+            <div style="background: #fff; padding: 15px; border-radius: 8px; margin-bottom: 20px; border: 1px solid #ececec;">
+                <h3 style="margin-top: 0; color: var(--primary-color);">🛒 待送出清單</h3>
+                <p style="margin-top: 0; color: #666;">
+                    先把奶茶、雞排等品項加進清單，確認完後再一次送出。
+                </p>
+                <div id="draftOrdersList"></div>
+                <div style="margin-top: 12px; display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
+                    <button class="action-btn success-btn" id="submitDraftOrdersBtn" onclick="submitDraftOrders()">一次送出待送出清單</button>
+                    <button class="action-btn danger-btn" onclick="clearDraftOrders()">清空待送出清單</button>
+                </div>
+            </div>
+
+            <div style="background: #fff; padding: 15px; border-radius: 8px; margin-bottom: 20px; border: 1px solid #ececec;">
+                <h3 style="margin-top: 0; color: var(--primary-color);">🧾 此裝置已送出的餐點</h3>
+                <p style="margin-top: 0; color: #666;">
+                    只有用同一台裝置與瀏覽器送出的餐點，才可以在這裡修改或取消。
+                </p>
+                <div id="participantOrdersMessage" style="display:none; margin-bottom: 10px; color: #b26a00; background: #fff7e6; padding: 10px; border-radius: 6px;"></div>
+                <div id="participantOrdersList"></div>
             </div>
 
             <div class="btn-group">
