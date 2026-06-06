@@ -1,10 +1,43 @@
 let currentOrderId = null;
 let currentVendorId = null;
+let currentOrderDeadline = null; // 【新增】追蹤目前訂單的截止時間
+let deadlineTimer = null; // 【新增】定時器
 
 window.dashboardModules = window.dashboardModules || [];
 window.dashboardModules.push(() => {
     refreshList();
+    // 【新增】啟動全域定時器，每秒檢查一次是否過期
+    if (deadlineTimer) clearInterval(deadlineTimer);
+    deadlineTimer = setInterval(checkDeadlineRealTime, 1000);
 });
+
+// 【新增】每秒執行的檢查邏輯
+function checkDeadlineRealTime() {
+    if (!currentOrderDeadline || !currentOrderId) return;
+
+    const now = new Date();
+    const deadline = new Date(currentOrderDeadline);
+
+    if (now > deadline) {
+        const deadlineDisplay = document.getElementById('deadlineDisplay');
+        const closeBtn = document.getElementById('closeOrderBtn');
+        
+        // 如果還沒顯示「已截止」，則更新 UI
+        if (deadlineDisplay && !deadlineDisplay.textContent.includes('已截止')) {
+            deadlineDisplay.textContent = '截止時間：已截止';
+            deadlineDisplay.style.color = 'red';
+            
+            if (closeBtn) {
+                closeBtn.textContent = '團購已截止';
+                closeBtn.disabled = true;
+                closeBtn.classList.add('disabled');
+            }
+            
+            // 重新讀取菜單以鎖定按鈕
+            loadOrderMenu(currentVendorId, true); 
+        }
+    }
+}
 
 async function refreshList() {
     const listDiv = document.getElementById('activeOrdersList');
@@ -56,14 +89,16 @@ async function goToItemView(orderId) {
         if (!res.ok) return;
         const order = await res.json();
         currentVendorId = order.vendorId;
+        currentOrderDeadline = order.deadline; // 【新增】儲存截止時間
 
         viewingTitle.textContent = '團購： ' + order.orderInfo;
         document.getElementById('orderAnnouncementDisplay').textContent = '📢 公告：' + (order.announcement || '無公告');
 
+        const deadlineDisplay = document.getElementById('deadlineDisplay');
         if (order.deadline) {
-            document.getElementById('deadlineDisplay').textContent = '截止時間：' + order.deadline.substring(0, 16).replace('T', ' ');
+            deadlineDisplay.textContent = '截止時間：' + order.deadline.substring(0, 16).replace('T', ' ');
         } else {
-            document.getElementById('deadlineDisplay').textContent = '無截止時間';
+            deadlineDisplay.textContent = '無截止時間';
         }
 
         const closeBtn = document.getElementById('closeOrderBtn');
@@ -79,13 +114,13 @@ async function goToItemView(orderId) {
             }
         }
 
-        loadOrderMenu(currentVendorId);
+        loadOrderMenu(currentVendorId, order.status === '已結單');
     } catch (e) {
         console.error(e);
     }
 }
 
-async function loadOrderMenu(vendorId) {
+async function loadOrderMenu(vendorId, isClosed = false) {
     const container = document.getElementById('dynamicOrderMenuContainer');
     if (!container) return;
 
@@ -123,9 +158,14 @@ async function loadOrderMenu(vendorId) {
 
                 const itemDiv = document.createElement('div');
                 itemDiv.className = 'item-card';
+                // 【修改】如果已結單，禁用按鈕
+                const btnHtml = isClosed 
+                    ? `<button class="action-btn disabled" style="padding: 5px 10px;" disabled>已截止</button>`
+                    : `<button class="action-btn" style="padding: 5px 10px;" onclick="openOrderForm('${item.id}')">我要點這個</button>`;
+
                 itemDiv.innerHTML = `
                     <div style="flex:1;"><strong>${item.name}</strong> <span>$${item.unitPrice}</span></div>
-                    <button class="action-btn" style="padding: 5px 10px;" onclick="openOrderForm('${item.id}')">我要點這個</button>
+                    ${btnHtml}
                 `;
                 catDiv.appendChild(itemDiv);
 
