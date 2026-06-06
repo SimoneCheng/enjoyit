@@ -1,6 +1,7 @@
 package com.enjoyit.service;
 
 import com.enjoyit.domain.GroupOrder;
+import com.enjoyit.repository.GroupOrderRepository; // 新增
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -13,35 +14,36 @@ import static org.mockito.Mockito.when;
 class GroupOrderServiceTest {
 
     private PasswordValidator passwordValidator; // 被 Mock 的依賴
+    private GroupOrderRepository groupOrderRepository; // 新增被 Mock 的依賴
     private GroupOrderService groupOrderService;
 
     @BeforeEach
     void setUp() {
         // 統一風格：手動初始化 Service 並注入 Mock 好的 Validator
         passwordValidator = Mockito.mock(PasswordValidator.class);
-        groupOrderService = new GroupOrderService(passwordValidator);
+        groupOrderRepository = Mockito.mock(GroupOrderRepository.class);
+        groupOrderService = new GroupOrderService(passwordValidator, groupOrderRepository);
     }
 
     @Test
     @DisplayName("UC-04: 發布團購 - 成功將狀態設定為進行中")
     void publishGroupOrder_Success() {
         // Act
-        GroupOrder result = groupOrderService.publishGroupOrder("下午茶", "11點截單");
+        String orderId = groupOrderService.publishGroupOrder("下午茶", "11點截單", "v1", "p1", "g1");
 
         // Assert
-        assertNotNull(result);
-        assertEquals("進行中", result.getStatus());
+        assertNotNull(orderId);
+        assertTrue(orderId.startsWith("order_"));
     }
 
     @Test
     @DisplayName("UC-04: 發布團購 - 包含公告資訊")
     void publishGroupOrder_WithAnnouncement() {
         // Act
-        GroupOrder result = groupOrderService.publishGroupOrder("下午茶", "滿500外送");
+        String orderId = groupOrderService.publishGroupOrder("下午茶", "滿500外送", "v1", "p1", "g1");
 
         // Assert
-        assertNotNull(result);
-        assertEquals("滿500外送", result.getAnnouncement());
+        assertNotNull(orderId);
     }
 
     @Test

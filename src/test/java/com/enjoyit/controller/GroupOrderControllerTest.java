@@ -15,21 +15,25 @@ import java.util.Map;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
-import org.mockito.Mockito;
-import static org.mockito.ArgumentMatchers.*;
-import static org.mockito.Mockito.when;
+import com.enjoyit.repository.InMemoryGroupOrderRepository;
 import com.enjoyit.service.GroupOrderService;
-import com.enjoyit.domain.GroupOrder;
-import java.util.Optional;
+import com.enjoyit.service.PasswordValidator;
 
 class GroupOrderControllerTest {
 
     private MockMvc mockMvc;
     private ObjectMapper objectMapper = new ObjectMapper();
-    private GroupOrderService groupOrderService = Mockito.mock(GroupOrderService.class);
+    
+    // 使用真實的 Service 與 In-Memory Repository，以支援「發佈 -> 結單 -> 驗證」的完整流程
+    private GroupOrderService groupOrderService;
 
     @BeforeEach
     void setUp() {
+        // 初始化真實的依賴
+        PasswordValidator passwordValidator = new PasswordValidator();
+        InMemoryGroupOrderRepository repository = new InMemoryGroupOrderRepository();
+        groupOrderService = new GroupOrderService(passwordValidator, repository);
+
         mockMvc = MockMvcBuilders.standaloneSetup(new GroupOrderController(groupOrderService))
                 // 👇 直接抽換底層的訊息轉換器
                 .setMessageConverters(
@@ -85,6 +89,7 @@ class GroupOrderControllerTest {
         publishReq.put("orderInfo", "測試防護網團購");
         publishReq.put("groupId", "secure_group");
         publishReq.put("adminPassword", "1234");
+        publishReq.put("vendorId", "vendor_001"); // 補足必要的店家資訊
 
         // 執行發起 API，並把回傳的 orderId 抓出來存進變數
         String orderId = mockMvc.perform(post("/api/group-orders/publish")
