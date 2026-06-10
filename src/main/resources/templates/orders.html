@@ -56,6 +56,21 @@
                 <div id="participantOrdersList"></div>
             </div>
 
+            <div id="myPaymentStatusCard" style="display:none; background: #e8f5e9; padding: 15px; border-radius: 8px; margin-bottom: 20px; border: 1px solid #c8e6c9;">
+                <h3 style="margin-top: 0; color: #2e7d32;">💰 我的付款狀態</h3>
+                <p>您本台裝置的應付總額為：<span id="myDueAmount" style="font-weight: bold; color: #d32f2f; font-size: 1.2rem;">$0</span></p>
+                <p>目前核帳狀態：<span id="myPayStatus" class="status-badge" style="background: #ff9800; color: white; padding: 3px 8px; border-radius: 4px;">未付款</span></p>
+            </div>
+
+            <div class="btn-group">
+                <button class="action-btn" style="background: #9c27b0;" onclick="toggleFinanceTable()">📋 主揪對帳功能</button>
+            </div>
+
+            <div id="hostFinanceSection" style="display:none; background: #fff; padding: 20px; margin-top: 20px; border-radius: 8px; border: 1px solid #ddd;">
+                <h3 style="color: #9c27b0; margin-top:0;">📊 團購財務結算對帳表</h3>
+                <div id="financeTableContainer"></div>
+            </div>
+
             <div class="btn-group">
                 <div style="flex: 1; display: flex; gap: 10px; align-items: center;">
                     <input type="datetime-local" id="updateDeadlineInput" style="width: auto;">

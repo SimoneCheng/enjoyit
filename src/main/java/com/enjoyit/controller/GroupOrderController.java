@@ -5,6 +5,7 @@ import com.enjoyit.dto.OrderItemsBatchRequest;
 import com.enjoyit.dto.DeadlineRequest;
 import com.enjoyit.service.OrderSummaryGenerator;
 import com.enjoyit.service.PasswordValidator;
+import com.enjoyit.repository.GroupOrderRepository;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -23,7 +24,15 @@ public class GroupOrderController {
     // 模擬 Heap 記憶體存儲
     private GroupOrder currentGroupOrder;
     private final PasswordValidator passwordValidator = new PasswordValidator();
-    private Map<String, GroupOrder> ordersMap = new java.util.concurrent.ConcurrentHashMap<>();
+    //private Map<String, GroupOrder> ordersMap = new java.util.concurrent.ConcurrentHashMap<>();
+
+    // 1. 移除原本的 private Map<String, GroupOrder> ordersMap ...
+    // 2. 改為注入 Repository
+        private final GroupOrderRepository groupOrderRepository;
+
+        public GroupOrderController(GroupOrderRepository groupOrderRepository) {
+            this.groupOrderRepository = groupOrderRepository;
+        }
 
     /**
      * CO-07: publishGroupOrder(orderInfo, announcement)
@@ -53,9 +62,10 @@ public class GroupOrderController {
             newOrder.setAnnouncement(announcement);
         }
 
-        ordersMap.put(orderId, newOrder);
-        this.currentGroupOrder = newOrder;
+        //ordersMap.put(orderId, newOrder);
 
+        this.currentGroupOrder = newOrder;
+        groupOrderRepository.save(newOrder);
         return ResponseEntity.ok(orderId);
     }
 
@@ -63,6 +73,7 @@ public class GroupOrderController {
     @GetMapping("/{orderId}")
     public ResponseEntity<?> getOrderDetails(@PathVariable String orderId, @RequestParam String groupId) {
         GroupOrder order = requireOrder(orderId, groupId);
+        groupOrderRepository.save(order);
         return ResponseEntity.ok(order);
     }
 
@@ -83,6 +94,7 @@ public class GroupOrderController {
         }
 
         order.getOrderItems().add(item);
+        groupOrderRepository.save(order);
         return ResponseEntity.ok(item);
     }
 
@@ -108,6 +120,7 @@ public class GroupOrderController {
         }
 
         order.getOrderItems().addAll(request.getItems());
+        groupOrderRepository.save(order);
         return ResponseEntity.ok(request.getItems());
     }
 
@@ -140,6 +153,7 @@ public class GroupOrderController {
         existingItem.setCustomizations(updatedItem.getCustomizations());
         existingItem.setQuantity(updatedItem.getQuantity());
         existingItem.setOrderTotalPrice(updatedItem.getOrderTotalPrice());
+        groupOrderRepository.save(order);
         return ResponseEntity.ok(existingItem);
     }
 
@@ -156,6 +170,7 @@ public class GroupOrderController {
 
         com.enjoyit.domain.OrderItem existingItem = findOrderItem(order.getOrderItems(), itemId);
         order.getOrderItems().remove(existingItem);
+        groupOrderRepository.save(order);
         return ResponseEntity.ok("餐點已取消");
     }
 
@@ -165,7 +180,8 @@ public class GroupOrderController {
         if (groupId == null || groupId.trim().isEmpty()) {
             return ResponseEntity.badRequest().body("缺少群組資訊");
         }
-        return ResponseEntity.ok(ordersMap.values().stream()
+
+        return ResponseEntity.ok(groupOrderRepository.findAll().stream()
                 .filter(order -> groupId.equals(order.getGroupId()))
                 .collect(Collectors.toList()));
     }
@@ -191,11 +207,13 @@ public class GroupOrderController {
 
         String deadlineStr = request.getDeadline();
         if (deadlineStr == null || deadlineStr.trim().isEmpty()) {
+            groupOrderRepository.save(order);
             return ResponseEntity.ok("未設定截止時間");
         }
         try {
             LocalDateTime newTime = LocalDateTime.parse(deadlineStr, DateTimeFormatter.ISO_LOCAL_DATE_TIME);
             order.setOrderDeadline(newTime);
+            groupOrderRepository.save(order);
             return ResponseEntity.ok("已更新截止時間");
         } catch (DateTimeParseException e) {
             return ResponseEntity.badRequest().body("時間格式不正確");
@@ -217,6 +235,7 @@ public class GroupOrderController {
         boolean isValid = passwordValidator.isValid(adminPassword, order.getAdminPassword());
 
         if (isValid) {
+            groupOrderRepository.save(order);
             return ResponseEntity.ok("AuthToken_Issued");
         }
         return ResponseEntity.status(401).body("Invalid Password");
@@ -233,6 +252,7 @@ public class GroupOrderController {
             return ResponseEntity.status(401).body("密碼錯誤，權限不足");
         }
         order.setStatus("已結單");
+        groupOrderRepository.save(order);
         return ResponseEntity.ok("訂單已成功結單");
     }
 
@@ -254,6 +274,7 @@ public class GroupOrderController {
         }
 
         OrderSummaryGenerator generator = new OrderSummaryGenerator();
+        groupOrderRepository.save(order);
         return ResponseEntity.ok(generator.createDetailedSummary(order.getOrderItems()));
     }
 
@@ -261,7 +282,7 @@ public class GroupOrderController {
         if (groupId == null || groupId.trim().isEmpty()) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "缺少群組資訊");
         }
-        GroupOrder order = ordersMap.get(orderId);
+        GroupOrder order = groupOrderRepository.findById(orderId).orElse(null);
         if (order == null || !groupId.equals(order.getGroupId())) {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "找不到該訂單");
         }
