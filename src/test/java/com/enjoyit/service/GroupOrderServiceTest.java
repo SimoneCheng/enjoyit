@@ -1,28 +1,23 @@
 package com.enjoyit.service;
 
 import com.enjoyit.domain.GroupOrder;
-import com.enjoyit.repository.GroupOrderRepository; // 新增
+import com.enjoyit.repository.InMemoryGroupOrderRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
-import org.mockito.Mockito;
 import java.time.LocalDateTime;
 
 import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.Mockito.when;
 
 class GroupOrderServiceTest {
 
-    private PasswordValidator passwordValidator; // 被 Mock 的依賴
-    private GroupOrderRepository groupOrderRepository; // 新增被 Mock 的依賴
     private GroupOrderService groupOrderService;
 
     @BeforeEach
     void setUp() {
-        // 統一風格：手動初始化 Service 並注入 Mock 好的 Validator
-        passwordValidator = Mockito.mock(PasswordValidator.class);
-        groupOrderRepository = Mockito.mock(GroupOrderRepository.class);
-        groupOrderService = new GroupOrderService(passwordValidator, groupOrderRepository);
+        PasswordValidator passwordValidator = new PasswordValidator();
+        InMemoryGroupOrderRepository repository = new InMemoryGroupOrderRepository();
+        groupOrderService = new GroupOrderService(passwordValidator, repository);
     }
 
     @Test
@@ -51,6 +46,7 @@ class GroupOrderServiceTest {
     void setOrderDeadline_ShouldCloseOrder_WhenTimeIsPast() {
         // Arrange
         GroupOrder order = new GroupOrder("測試");
+        order.setOrderId("order_test");
         LocalDateTime pastTime = LocalDateTime.now().minusDays(1);
 
         // Act
@@ -63,30 +59,22 @@ class GroupOrderServiceTest {
     @Test
     @DisplayName("UC-04: 設定團購權限 - 驗證管理者密碼成功")
     void verifyAdminAccess_Success() {
-        // Arrange
         String input = "1234";
         String saved = "1234";
-        when(passwordValidator.isValid(input, saved)).thenReturn(true);
 
-        // Act
         boolean result = groupOrderService.verifyAdminAccess(input, saved);
 
-        // Assert
         assertTrue(result);
     }
 
     @Test
     @DisplayName("UC-04: 設定團購權限 - 驗證管理者密碼失敗")
     void verifyAdminAccess_Failure() {
-        // Arrange
         String input = "wrong";
         String saved = "1234";
-        when(passwordValidator.isValid(input, saved)).thenReturn(false);
 
-        // Act
         boolean result = groupOrderService.verifyAdminAccess(input, saved);
 
-        // Assert
         assertFalse(result);
     }
 }

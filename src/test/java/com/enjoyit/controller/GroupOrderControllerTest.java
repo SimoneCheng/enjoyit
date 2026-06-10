@@ -23,13 +23,10 @@ class GroupOrderControllerTest {
 
     private MockMvc mockMvc;
     private ObjectMapper objectMapper = new ObjectMapper();
-    
-    // 使用真實的 Service 與 In-Memory Repository，以支援「發佈 -> 結單 -> 驗證」的完整流程
     private GroupOrderService groupOrderService;
 
     @BeforeEach
     void setUp() {
-        // 初始化真實的依賴
         PasswordValidator passwordValidator = new PasswordValidator();
         InMemoryGroupOrderRepository repository = new InMemoryGroupOrderRepository();
         groupOrderService = new GroupOrderService(passwordValidator, repository);
@@ -89,7 +86,7 @@ class GroupOrderControllerTest {
         publishReq.put("orderInfo", "測試防護網團購");
         publishReq.put("groupId", "secure_group");
         publishReq.put("adminPassword", "1234");
-        publishReq.put("vendorId", "vendor_001"); // 補足必要的店家資訊
+        publishReq.put("vendorId", "vendor_001");
 
         // 執行發起 API，並把回傳的 orderId 抓出來存進變數
         String orderId = mockMvc.perform(post("/api/group-orders/publish")
@@ -99,7 +96,9 @@ class GroupOrderControllerTest {
                 .andReturn().getResponse().getContentAsString();
 
         // 步驟 2：模擬管理員將這個團購結單
-        mockMvc.perform(post("/api/group-orders/close/" + orderId + "?groupId=secure_group"))
+        mockMvc.perform(post("/api/group-orders/close/" + orderId + "?groupId=secure_group")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"password\":\"1234\"}"))
                 .andExpect(status().isOk());
 
         // 步驟 3：模擬遲到的同學嘗試送出點餐
@@ -112,5 +111,119 @@ class GroupOrderControllerTest {
                 .andExpect(status().isBadRequest())
                 // 驗證錯誤訊息是否正確
                 .andExpect(content().string("此團購已截止，無法點餐"));
+    }
+
+    @Test
+    @DisplayName("測試點餐驗證：未填寫訂購人姓名時應拒絕送出")
+    void testAddOrderItem_MissingOrderFor() throws Exception {
+        Map<String, String> publishReq = new HashMap<>();
+        publishReq.put("orderInfo", "命名驗證團購");
+        publishReq.put("groupId", "naming_group");
+        publishReq.put("adminPassword", "1234");
+        publishReq.put("vendorId", "vendor_001");
+
+        String orderId = mockMvc.perform(post("/api/group-orders/publish")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(publishReq)))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+
+        String orderItemJson = "{\"participantId\":\"device_1\",\"itemName\":\"紅茶\",\"unitPrice\":30,\"quantity\":1,\"orderTotalPrice\":30}";
+
+        mockMvc.perform(post("/api/group-orders/" + orderId + "/items?groupId=naming_group")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(orderItemJson))
+                .andExpect(status().isBadRequest())
+                .andExpect(content().string("請輸入訂購人姓名"));
+    }
+
+    @Test
+    @DisplayName("測試訂單項目修改與取消：應可更新既有餐點並刪除")
+    void testUpdateAndDeleteOrderItem() throws Exception {
+        Map<String, String> publishReq = new HashMap<>();
+        publishReq.put("orderInfo", "編輯餐點團購");
+        publishReq.put("groupId", "edit_group");
+        publishReq.put("adminPassword", "1234");
+        publishReq.put("vendorId", "vendor_001");
+
+        String orderId = mockMvc.perform(post("/api/group-orders/publish")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(publishReq)))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+
+        String createJson = "{\"participantId\":\"device_1\",\"orderFor\":\"王小明\",\"itemName\":\"綠茶\",\"unitPrice\":30,\"quantity\":1,\"orderTotalPrice\":30,\"customizations\":[]}";
+        String createdItem = mockMvc.perform(post("/api/group-orders/" + orderId + "/items?groupId=edit_group")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(createJson))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.orderFor").value("王小明"))
+                .andReturn().getResponse().getContentAsString();
+
+        String itemId = objectMapper.readTree(createdItem).get("itemID").asText();
+        String updateJson = "{\"participantId\":\"device_1\",\"orderFor\":\"王小美\",\"itemName\":\"奶茶\",\"unitPrice\":40,\"quantity\":2,\"orderTotalPrice\":80,\"customizations\":[\"少冰\"]}";
+
+        mockMvc.perform(put("/api/group-orders/" + orderId + "/items/" + itemId + "?groupId=edit_group")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(updateJson))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.orderFor").value("王小美"))
+                .andExpect(jsonPath("$.itemName").value("奶茶"))
+                .andExpect(jsonPath("$.quantity").value(2))
+                .andExpect(jsonPath("$.orderTotalPrice").value(80));
+
+        mockMvc.perform(delete("/api/group-orders/" + orderId + "/items/" + itemId + "?groupId=edit_group"))
+                .andExpect(status().isOk())
+                .andExpect(content().string("餐點已取消"));
+    }
+
+    @Test
+    @DisplayName("測試批次點餐：應可一次新增多筆餐點")
+    void testAddOrderItemsBatch() throws Exception {
+        Map<String, String> publishReq = new HashMap<>();
+        publishReq.put("orderInfo", "批次點餐團購");
+        publishReq.put("groupId", "batch_group");
+        publishReq.put("adminPassword", "1234");
+        publishReq.put("vendorId", "vendor_001");
+
+        String orderId = mockMvc.perform(post("/api/group-orders/publish")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(publishReq)))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+
+        String batchJson = """
+                {
+                  "items": [
+                    {
+                      "participantId": "device_1",
+                      "orderFor": "王小明",
+                      "itemName": "奶茶",
+                      "menuItemId": "item_1",
+                      "unitPrice": 50,
+                      "quantity": 1,
+                      "orderTotalPrice": 50,
+                      "customizations": []
+                    },
+                    {
+                      "participantId": "device_1",
+                      "orderFor": "王小明",
+                      "itemName": "雞排",
+                      "menuItemId": "item_2",
+                      "unitPrice": 75,
+                      "quantity": 1,
+                      "orderTotalPrice": 75,
+                      "customizations": []
+                    }
+                  ]
+                }
+                """;
+
+        mockMvc.perform(post("/api/group-orders/" + orderId + "/items/batch?groupId=batch_group")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(batchJson))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].itemName").value("奶茶"))
+                .andExpect(jsonPath("$[1].itemName").value("雞排"));
     }
 }

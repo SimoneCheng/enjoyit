@@ -2,6 +2,7 @@ package com.enjoyit.controller;
 
 import com.enjoyit.domain.GroupOrder;
 import com.enjoyit.domain.OrderItem;
+import com.enjoyit.dto.OrderItemsBatchRequest;
 import com.enjoyit.dto.DeadlineRequest;
 import com.enjoyit.service.GroupOrderService;
 import com.enjoyit.service.OrderSummaryGenerator;
@@ -12,6 +13,7 @@ import org.springframework.web.server.ResponseStatusException;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
+import java.util.List;
 import java.util.Map;
 
 @RestController
@@ -56,12 +58,79 @@ public class GroupOrderController {
             @RequestParam String groupId,
             @RequestBody OrderItem item) {
         GroupOrder order = requireOrder(orderId, groupId);
-        if ("已結單".equals(order.getStatus())) {
-            return ResponseEntity.badRequest().body("此團購已截止，無法點餐");
+        String closedMessage = getClosedOrderMessage(order);
+        if (closedMessage != null) {
+            return ResponseEntity.badRequest().body(closedMessage);
+        }
+        String validationMessage = validateOrderItem(item);
+        if (validationMessage != null) {
+            return ResponseEntity.badRequest().body(validationMessage);
         }
 
         groupOrderService.addOrderItem(order, item);
-        return ResponseEntity.ok("餐點新增成功");
+        return ResponseEntity.ok(item);
+    }
+
+    @PostMapping("/{orderId}/items/batch")
+    public ResponseEntity<?> addOrderItemsBatch(
+            @PathVariable String orderId,
+            @RequestParam String groupId,
+            @RequestBody OrderItemsBatchRequest request) {
+        GroupOrder order = requireOrder(orderId, groupId);
+        String closedMessage = getClosedOrderMessage(order);
+        if (closedMessage != null) {
+            return ResponseEntity.badRequest().body(closedMessage);
+        }
+        if (request == null || request.getItems() == null || request.getItems().isEmpty()) {
+            return ResponseEntity.badRequest().body("待送出的餐點不能為空");
+        }
+
+        for (OrderItem item : request.getItems()) {
+            String validationMessage = validateOrderItem(item);
+            if (validationMessage != null) {
+                return ResponseEntity.badRequest().body(validationMessage);
+            }
+        }
+
+        groupOrderService.addOrderItems(order, request.getItems());
+        return ResponseEntity.ok(request.getItems());
+    }
+
+    @PutMapping("/{orderId}/items/{itemId}")
+    public ResponseEntity<?> updateOrderItem(
+            @PathVariable String orderId,
+            @PathVariable String itemId,
+            @RequestParam String groupId,
+            @RequestBody OrderItem updatedItem) {
+        GroupOrder order = requireOrder(orderId, groupId);
+        String closedMessage = getClosedOrderMessage(order);
+        if (closedMessage != null) {
+            return ResponseEntity.badRequest().body(closedMessage);
+        }
+        String validationMessage = validateOrderItem(updatedItem);
+        if (validationMessage != null) {
+            return ResponseEntity.badRequest().body(validationMessage);
+        }
+
+        OrderItem existingItem = findOrderItem(order.getOrderItems(), itemId);
+        groupOrderService.updateOrderItem(order, existingItem, updatedItem);
+        return ResponseEntity.ok(existingItem);
+    }
+
+    @DeleteMapping("/{orderId}/items/{itemId}")
+    public ResponseEntity<?> deleteOrderItem(
+            @PathVariable String orderId,
+            @PathVariable String itemId,
+            @RequestParam String groupId) {
+        GroupOrder order = requireOrder(orderId, groupId);
+        String closedMessage = getClosedOrderMessage(order);
+        if (closedMessage != null) {
+            return ResponseEntity.badRequest().body(closedMessage);
+        }
+
+        OrderItem existingItem = findOrderItem(order.getOrderItems(), itemId);
+        groupOrderService.deleteOrderItem(order, existingItem);
+        return ResponseEntity.ok("餐點已取消");
     }
 
     @GetMapping("/all")
@@ -72,11 +141,17 @@ public class GroupOrderController {
         return ResponseEntity.ok(groupOrderService.getOrdersByGroupId(groupId));
     }
 
+    /**
+     * CO-08: setOrderDeadline(newTime)
+     * 設定團購截止時間，並由領域物件判斷是否截止
+     */
+    // 4. 更新：設定截止時間 (必須針對特定 orderId，不然多個團購會打架)
+    // 升級版：設定截止時間 (需透過 URL 參數夾帶密碼驗證)
     @PutMapping("/{orderId}/deadline")
     public ResponseEntity<?> setOrderDeadline(
             @PathVariable String orderId,
             @RequestParam String groupId,
-            @RequestParam(required = false) String password,
+            @RequestParam(required = false) String password, // 新增密碼參數
             @RequestBody DeadlineRequest request) {
         GroupOrder order = requireOrder(orderId, groupId);
 
@@ -97,6 +172,9 @@ public class GroupOrderController {
         }
     }
 
+    /**
+     * CO-09: inputAdminPassword (升級版：針對特定 orderId 驗證)
+     */
     @PostMapping("/{orderId}/validate-admin")
     public ResponseEntity<?> inputAdminPassword(
             @PathVariable String orderId,
@@ -114,27 +192,85 @@ public class GroupOrderController {
     }
 
     @PostMapping("/close/{orderId}")
-    public ResponseEntity<?> closeOrder(@PathVariable String orderId, @RequestParam String groupId) {
+    public ResponseEntity<?> closeOrder(
+            @PathVariable String orderId,
+            @RequestParam String groupId,
+            @RequestBody(required = false) Map<String, String> request) {
         GroupOrder order = requireOrder(orderId, groupId);
+        String password = request == null ? null : request.get("password");
+        if (!groupOrderService.verifyAdminAccess(password, order.getAdminPassword())) {
+            return ResponseEntity.status(401).body("密碼錯誤，權限不足");
+        }
         groupOrderService.closeOrder(order);
         return ResponseEntity.ok("訂單已成功結單");
     }
 
+    /**
+     * CO-10: downloadOrderSummary (升級版：針對特定 orderId 產出總表)
+     */
     @GetMapping("/{orderId}/summary")
-    public ResponseEntity<?> downloadOrderSummary(@PathVariable String orderId, @RequestParam String groupId) {
+    public ResponseEntity<?> downloadOrderSummary(
+            @PathVariable String orderId,
+            @RequestParam String groupId,
+            @RequestParam(required = false) String password) {
         GroupOrder order = requireOrder(orderId, groupId);
+        if (!groupOrderService.verifyAdminAccess(password, order.getAdminPassword())) {
+            return ResponseEntity.status(401).body("密碼錯誤，權限不足");
+        }
 
         if (!"已結單".equals(order.getStatus())) {
             return ResponseEntity.badRequest().body("Error: Order not closed");
         }
 
         OrderSummaryGenerator generator = new OrderSummaryGenerator();
-        return ResponseEntity.ok(generator.createSummary(order.getOrderItems()));
+        return ResponseEntity.ok(generator.createDetailedSummary(order.getOrderItems()));
     }
 
     private GroupOrder requireOrder(String orderId, String groupId) {
+        if (groupId == null || groupId.trim().isEmpty()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "缺少群組資訊");
+        }
         return groupOrderService.getOrderById(orderId)
                 .filter(order -> groupId.equals(order.getGroupId()))
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "找不到該訂單"));
+    }
+
+    private String getClosedOrderMessage(GroupOrder order) {
+        if ("已結單".equals(order.getStatus())) {
+            return "此團購已截止，無法點餐";
+        }
+        return null;
+    }
+
+    private String validateOrderItem(OrderItem item) {
+        if (item == null) {
+            return "缺少餐點資料";
+        }
+        if (item.getParticipantId() == null || item.getParticipantId().trim().isEmpty()) {
+            return "缺少操作裝置識別";
+        }
+        if (item.getOrderFor() == null || item.getOrderFor().trim().isEmpty()) {
+            return "請輸入訂購人姓名";
+        }
+        if (item.getItemName() == null || item.getItemName().trim().isEmpty()) {
+            return "缺少餐點名稱";
+        }
+        if (item.getQuantity() <= 0) {
+            return "數量必須至少 1 份";
+        }
+        if (item.getUnitPrice() < 0 || item.getOrderTotalPrice() < 0) {
+            return "金額不可為負數";
+        }
+        if (item.getCustomizations() == null) {
+            item.setCustomizations(new java.util.ArrayList<>());
+        }
+        return null;
+    }
+
+    private OrderItem findOrderItem(List<OrderItem> orderItems, String itemId) {
+        return orderItems.stream()
+                .filter(item -> itemId.equals(item.getItemID()))
+                .findFirst()
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "找不到該餐點"));
     }
 }

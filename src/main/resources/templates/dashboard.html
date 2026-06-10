@@ -36,6 +36,9 @@
         if (section) section.classList.add('active');
         const navBtn = document.getElementById('nav-' + id);
         if (navBtn) navBtn.classList.add('active');
+        if (id === 'orders' && typeof window.handleOrdersSectionShown === 'function') {
+            window.handleOrdersSectionShown();
+        }
     }
 </script>
 

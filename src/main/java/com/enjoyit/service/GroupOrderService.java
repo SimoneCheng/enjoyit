@@ -6,6 +6,7 @@ import com.enjoyit.repository.GroupOrderRepository;
 import org.springframework.stereotype.Service;
 import java.time.LocalDateTime;
 import java.util.Collection;
+import java.util.List;
 import java.util.Optional;
 import java.util.stream.Collectors;
 
@@ -52,6 +53,32 @@ public class GroupOrderService {
 
     public void addOrderItem(GroupOrder order, OrderItem item) {
         order.getOrderItems().add(item);
+        groupOrderRepository.save(order);
+    }
+
+    public void addOrderItems(GroupOrder order, List<OrderItem> items) {
+        order.getOrderItems().addAll(items);
+        groupOrderRepository.save(order);
+    }
+
+    public void updateOrderItem(GroupOrder order, OrderItem existingItem, OrderItem updatedItem) {
+        updatedItem.setParticipantId(updatedItem.getParticipantId().trim());
+        updatedItem.setOrderFor(updatedItem.getOrderFor().trim());
+        updatedItem.setItemName(updatedItem.getItemName().trim());
+
+        existingItem.setParticipantId(updatedItem.getParticipantId());
+        existingItem.setOrderFor(updatedItem.getOrderFor());
+        existingItem.setMenuItemId(updatedItem.getMenuItemId());
+        existingItem.setItemName(updatedItem.getItemName());
+        existingItem.setUnitPrice(updatedItem.getUnitPrice());
+        existingItem.setCustomizations(updatedItem.getCustomizations());
+        existingItem.setQuantity(updatedItem.getQuantity());
+        existingItem.setOrderTotalPrice(updatedItem.getOrderTotalPrice());
+        groupOrderRepository.save(order);
+    }
+
+    public void deleteOrderItem(GroupOrder order, OrderItem existingItem) {
+        order.getOrderItems().remove(existingItem);
         groupOrderRepository.save(order);
     }
 

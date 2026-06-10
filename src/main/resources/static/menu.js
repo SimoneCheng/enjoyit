@@ -255,6 +255,9 @@ class MenuEditor {
                     alert('✅ 菜單發布成功！已同步至所有團購活動。');
                 }
                 this.loadMenuData();
+                if (typeof window.onMenuUpdated === 'function') {
+                    window.onMenuUpdated(this.vendorId);
+                }
             } else {
                 alert('發布失敗，請確認後端服務。');
             }
