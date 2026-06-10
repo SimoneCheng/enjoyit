@@ -20,6 +20,11 @@
             <div th:replace="menu :: content"></div>
         </section>
 
+        <!-- 店家管理區塊 -->
+        <section id="vendorsSection" class="section-content">
+            <div th:replace="vendors :: content"></div>
+        </section>
+
         <!-- 團購訂單區塊 (包含列表與詳情) -->
         <section id="ordersSection" class="section-content">
             <div th:replace="orders :: list"></div>
@@ -46,5 +51,6 @@
 <script th:src="@{/publish.js}"></script>
 <script th:src="@{/orders.js}"></script>
 <script th:src="@{/menu.js}"></script>
+<script th:src="@{/vendor.js}"></script>
 </body>
 </html>

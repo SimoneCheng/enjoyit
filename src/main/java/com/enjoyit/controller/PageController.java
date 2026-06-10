@@ -24,4 +24,9 @@ public class PageController {
     public String ordersPage() {
         return "orders";
     }
+
+    @GetMapping("/dashboard/vendors")
+    public String vendorsPage() {
+        return "vendors";
+    }
 }

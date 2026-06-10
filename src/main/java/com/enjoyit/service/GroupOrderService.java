@@ -43,8 +43,19 @@ public class GroupOrderService {
     /**
      * 對應 CO-09: 驗證管理者權限
      */
+    /**
+     * 對應 CO-09: 驗證管理者權限
+     */
     public boolean verifyAdminAccess(String inputPassword, String savedPassword) {
         // 使用 Pure Fabrication 的驗證器進行比對
         return passwordValidator.isValid(inputPassword, savedPassword);
+    }
+
+    /**
+     * 檢查特定店家是否有進行中的團購
+     */
+    public boolean hasOngoingOrdersByVendor(String vendorId) {
+        // TODO: 未來應從 GroupOrderRepository 查詢
+        return false; 
     }
 }

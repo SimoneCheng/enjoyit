@@ -52,3 +52,24 @@ if (typeof module !== 'undefined' && module.exports) {
     // 在 dashboard-base.js 加上： module.exports = { ensureLoggedIn };
     module.exports = { handlePublish };
 }
+async function fetchVendorsForPublish() {
+    const select = document.getElementById('vendorSelect');
+    if (!select) return;
+
+    try {
+        const response = await fetch('/api/vendors');
+        const vendors = await response.json();
+        
+        const currentVal = select.value;
+        select.innerHTML = '<option value="">-- 請選擇店家 --</option>' + 
+            vendors.map(v => `<option value="${v.id}">${v.name}</option>`).join('');
+        
+        if (currentVal) select.value = currentVal;
+    } catch (e) {
+        console.error('無法載入店家清單:', e);
+    }
+}
+
+// 註冊到初始化
+window.dashboardModules.push(fetchVendorsForPublish);
+window.fetchVendorsForPublish = fetchVendorsForPublish;

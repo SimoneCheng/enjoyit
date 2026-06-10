@@ -10,7 +10,7 @@ class VendorTest {
     @Test
     @DisplayName("測試建立店家：應自動產生 UUID、設定名稱，並預設帶有一張空菜單")
     void testVendorCreation() {
-        Vendor vendor = new Vendor("五十嵐");
+        Vendor vendor = new Vendor("五十嵐", "02-23456789", "台北市信義區1號");
 
         assertNotNull(vendor.getId(), "應自動產生店家 UUID");
         assertEquals("五十嵐", vendor.getName());
@@ -23,7 +23,7 @@ class VendorTest {
     @Test
     @DisplayName("測試屬性修改：應能重新設定店家 ID 與替換整張菜單")
     void testSetters() {
-        Vendor vendor = new Vendor("可不可");
+        Vendor vendor = new Vendor("可不可", "02-98765432", "台中市公益路100號");
         vendor.setId("custom_vendor_999");
 
         Menu newMenu = new Menu();

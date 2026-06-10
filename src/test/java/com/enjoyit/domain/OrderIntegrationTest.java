@@ -11,7 +11,7 @@ public class OrderIntegrationTest {
     @Test
     public void testMenuItemToOrderItemConversionAndPriceCalculation() {
         // --- 1. 模擬主揪建立菜單 (UC-03 範圍) ---
-        Vendor vendor = new Vendor("美味便當店");
+        Vendor vendor = new Vendor("美味便當店", "02-11112222", "台北市信義路二段2號");
         Menu menu = vendor.getMenu();
 
         MenuCategory category = new MenuCategory("主食區");
