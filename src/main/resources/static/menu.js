@@ -1,7 +1,58 @@
 window.dashboardModules = window.dashboardModules || [];
-window.dashboardModules.push(() => {
-    window.menuEditorInstance = new MenuEditor('vendor_001');
-});
+
+async function fetchVendorsForMenu() {
+    const select = document.getElementById('vendorSelect');
+    if (!select) return;
+
+    const urlParams = new URLSearchParams(window.location.search);
+    const initialVendorId = urlParams.get('vendorId');
+
+    try {
+        const response = await fetch('/api/vendors');
+        const vendors = await response.json();
+        
+        const currentVal = select.value || initialVendorId;
+        
+        if (vendors && vendors.length > 0) {
+            select.innerHTML = '<option value="">-- 請選擇管理店家 --</option>' + 
+                vendors.map(v => `
+                    <option value="${v.id}" ${currentVal === v.id ? 'selected' : ''}>${v.name}</option>
+                `).join('');
+
+            // 如果選單已有值但編輯器未初始化，則嘗試初始化
+            const activeVendorId = select.value;
+            if (activeVendorId && !window.menuEditorInstance) {
+                window.menuEditorInstance = new MenuEditor(activeVendorId);
+            }
+        } else {
+            select.innerHTML = '<option value="">-- 請先建立店家 --</option>';
+        }
+    } catch (e) {
+        console.error('無法載入店家清單:', e);
+    }
+}
+
+function initMenuEditor() {
+    const select = document.getElementById('vendorSelect');
+    if (!select) return;
+
+    select.addEventListener('change', (e) => {
+        const newVendorId = e.target.value;
+        if (newVendorId) {
+            if (window.menuEditorInstance) {
+                window.menuEditorInstance.updateVendor(newVendorId);
+            } else {
+                window.menuEditorInstance = new MenuEditor(newVendorId);
+            }
+        }
+    });
+
+    fetchVendorsForMenu();
+}
+
+// 註冊到初始化
+window.dashboardModules.push(initMenuEditor);
+window.fetchVendorsForMenu = fetchVendorsForMenu;
 
 class MenuEditor {
     constructor(vendorId) {
@@ -10,6 +61,14 @@ class MenuEditor {
         this.menuData = { isActive: true, categories: [] };
         this.container = document.getElementById('menu-container');
         this.initEventListeners();
+        this.loadMenuData();
+    }
+
+    updateVendor(newVendorId) {
+        this.vendorId = newVendorId;
+        const url = new URL(window.location);
+        url.searchParams.set('vendorId', newVendorId);
+        window.history.pushState({}, '', url);
         this.loadMenuData();
     }
 
@@ -268,5 +327,5 @@ class MenuEditor {
 }
 // 讓 Node.js (Jest) 可以載入此函式進行測試
 if (typeof module !== 'undefined' && module.exports) {
-    module.exports = { MenuEditor };
+    module.exports = { MenuEditor, initMenuEditor };
 }

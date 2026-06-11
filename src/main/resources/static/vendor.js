@@ -90,6 +90,9 @@ async function handleVendorSubmit(event) {
             if (typeof window.fetchVendorsForPublish === 'function') {
                 window.fetchVendorsForPublish();
             }
+            if (typeof window.fetchVendorsForMenu === 'function') {
+                window.fetchVendorsForMenu();
+            }
         } else {
             const errorMsg = await response.text();
             alert('操作失敗: ' + errorMsg);
@@ -109,6 +112,9 @@ async function deleteVendor(id) {
             fetchVendors();
             if (typeof window.fetchVendorsForPublish === 'function') {
                 window.fetchVendorsForPublish();
+            }
+            if (typeof window.fetchVendorsForMenu === 'function') {
+                window.fetchVendorsForMenu();
             }
         } else {
             const errorMsg = await response.text();

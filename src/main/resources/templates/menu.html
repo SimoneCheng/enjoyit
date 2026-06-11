@@ -11,7 +11,10 @@
         <section th:fragment="content">
             <h2>店家菜單編輯器</h2>
             <div class="form-group">
-                <input type="text" id="vendorIdInput" value="vendor_001" readonly style="background-color: #eee;">
+                <label>選擇管理店家</label>
+                <select id="vendorSelect">
+                    <!-- 由 JavaScript 動態填充 -->
+                </select>
             </div>
             <div id="menu-container"></div>
             <div class="form-group" style="display: flex; gap: 10px; align-items: center;">
