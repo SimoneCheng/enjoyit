@@ -243,7 +243,12 @@ async function goToItemView(orderId) {
     } catch (e) {
         console.error(e);
     }
-    fetchMyPaymentStatus(orderId);
+
+    // 如果對帳表開著，順便刷新它
+    const financeSection = document.getElementById('hostFinanceSection');
+    if (financeSection && financeSection.style.display === 'block') {
+        loadPublicFinanceTable();
+    }
 }
 
 function renderDraftOrders(order) {
@@ -631,35 +636,45 @@ async function submitOrderItem(itemId, itemName, basePrice) {
 }
 
 async function submitDraftOrders() {
-    const drafts = loadDraftOrderRecords(currentOrderId);
-    if (drafts.length === 0) {
-        alert('待送出清單目前是空的');
-        return;
-    }
+    if (!currentGroupId) return alert('缺少群組資訊，請重新登入');
 
-    const payload = {
-        items: drafts.map(({ draftId, ...item }) => item)
-    };
+    const draftItems = loadDraftOrderRecords(currentOrderId);
+    if (draftItems.length === 0) return alert('沒有待送出的餐點');
+
+    // 淨化資料：剃除後端不認識的 draftId
+    const cleanPayload = draftItems.map(item => {
+        const { draftId, ...restOfItem } = item;
+        return restOfItem;
+    });
 
     try {
         const res = await fetch(`/api/group-orders/${currentOrderId}/items/batch?groupId=${encodeURIComponent(currentGroupId)}`, {
             method: 'POST',
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify(payload)
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ items: cleanPayload })
         });
+
         if (res.ok) {
+            // 🌟 關鍵修正：讀取後端成功存檔後回傳的實體餐點陣列（裡面包含後端隨機生成的唯一 itemID）
             const savedItems = await res.json();
-            savedItems.forEach(item => {
-                upsertLocalOrderRecord(currentOrderId, normalizeOrderItem(item));
-            });
-            clearDraftOrderRecords(currentOrderId);
-            alert(`✅ 已一次送出 ${savedItems.length} 筆餐點`);
+
+            // 🌟 關鍵修正：將這批成功的餐點逐一寫入這台裝置的本地紀錄中，讓前端欄位能正確追蹤
+            if (Array.isArray(savedItems)) {
+                savedItems.forEach(item => {
+                    upsertLocalOrderRecord(currentOrderId, item);
+                });
+            }
+
+            alert('點餐成功！');
+            clearDraftOrders();
             await goToItemView(currentOrderId);
         } else {
-            handleOrderMutationError(await res.text());
+            const errText = await res.text();
+            alert('送出失敗：\n' + errText.substring(0, 150) + (errText.length > 150 ? '...' : ''));
         }
     } catch (e) {
-        alert('批次送出失敗');
+        console.error("前端執行發生錯誤：", e);
+        alert('連線異常，請重新整理網頁確認。');
     }
 }
 
@@ -690,22 +705,31 @@ function clearDraftOrders() {
 }
 
 async function deleteOrderItem(itemId) {
-    const confirmed = typeof confirm === 'function' ? confirm('確定要取消這筆餐點嗎？') : true;
-    if (!confirmed) return;
+    // 1. 檢查群組資訊
+    if (!currentGroupId) return alert('缺少群組資訊，請重新登入');
+
+    // 🌟 關鍵修正：已經把容易卡死的 isProcessing 防呆機制徹底刪除！
+
+    // 2. 瀏覽器內建的 confirm 本身就會擋住畫面，完美防止連點
+    if (!confirm('確定要取消這份餐點嗎？')) return;
 
     try {
         const res = await fetch(`/api/group-orders/${currentOrderId}/items/${itemId}?groupId=${encodeURIComponent(currentGroupId)}`, {
             method: 'DELETE'
         });
+
         if (res.ok) {
-            removeLocalOrderRecord(currentOrderId, itemId);
             alert('取消餐點成功');
+            // 🌟 額外保險：同步將這筆被取消的餐點從前端這台裝置的記憶體中移除
+            removeLocalOrderRecord(currentOrderId, itemId);
             await goToItemView(currentOrderId);
         } else {
-            handleOrderMutationError(await res.text());
+            const errText = await res.text();
+            alert('取消失敗：\n' + errText.substring(0, 150) + (errText.length > 150 ? '...' : ''));
         }
     } catch (e) {
-        alert('取消失敗');
+        console.error("前端執行發生錯誤：", e);
+        alert('連線異常，請重新整理網頁確認。');
     }
 }
 
@@ -768,196 +792,34 @@ async function adminAction(type) {
     }
 }
 
-if (typeof module !== 'undefined' && module.exports) {
-    module.exports = {
-        submitOrderItem,
-        submitDraftOrders,
-        clearDraftOrders,
-        adminAction,
-        goToItemView,
-        deleteOrderItem,
-        startEditDraftItem,
-        startEditSubmittedItem,
-        buildOrderPayload,
-        loadLocalOrderRecords,
-        loadDraftOrderRecords
-    };
-}
+// ==========================================
+// UC-07: 財務對帳相關功能 (最新版本)
+// ==========================================
 
-// UC-07: 獲取個人帳單明細
-async function viewMyBill() {
-    if (!currentOrderId) return alert('請先選擇一個團購');
-    const deviceId = getDeviceId();
-
-    try {
-        const res = await fetch(`/api/group-orders/${currentOrderId}/payments/bill?participantId=${deviceId}`);
-        if (!res.ok) throw new Error(await res.text());
-        const bill = await res.json();
-
-        const financeDiv = document.getElementById('financeSection');
-        financeDiv.style.display = 'block';
-        financeDiv.innerHTML = `
-            <h3 style="color: #ff9800;">💰 個人帳單</h3>
-            <p><strong>應付總額：</strong> $${bill.amountDue}</p>
-            <p><strong>目前狀態：</strong> ${bill.status}</p>
-            <hr>
-            <h4>回報付款狀態</h4>
-            <select id="payMethod"><option value="現金">現金</option><option value="轉帳">轉帳</option></select>
-            <input type="text" id="payDetails" placeholder="備註 (例如轉帳末五碼)">
-            <button onclick="reportPayment('${deviceId}')" style="margin-top: 10px;">送出回報</button>
-        `;
-    } catch (e) {
-        alert('無法取得帳單：可能尚未結單產生財務紀錄');
-    }
-}
-
-// UC-07: 參與者回報付款
-async function reportPayment(participantId) {
-    const method = document.getElementById('payMethod').value;
-    const details = document.getElementById('payDetails').value;
-
-    const res = await fetch(`/api/group-orders/${currentOrderId}/payments/report`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ participantId, method, details })
-    });
-
-    if (res.ok) {
-        alert('付款回報成功！等待主揪確認。');
-        viewMyBill(); // 重新整理畫面
-    } else {
-        alert(await res.text());
-    }
-}
-
-// UC-07: 主揪查看所有財務紀錄與核帳
-async function manageFinances() {
-    if (!currentOrderId) return;
-    const pwd = prompt('請輸入管理者密碼以進行財務管理：');
-    if (!pwd) return;
-
-    try {
-        const res = await fetch(`/api/group-orders/${currentOrderId}/payments`);
-        if (!res.ok) throw new Error('無法取得財務明細');
-        const records = await res.json();
-
-        let html = `<h3 style="color: #9c27b0;">📋 財務核帳管理</h3>`;
-        html += `<table style="width: 100%; text-align: left; border-collapse: collapse;">
-                    <tr style="border-bottom: 2px solid #ddd;">
-                        <th>參與者</th><th>應付</th><th>狀態</th><th>方式</th><th>明細</th><th>操作</th>
-                    </tr>`;
-
-        records.forEach(r => {
-            html += `<tr style="border-bottom: 1px solid #eee;">
-                        <td>${r.participantId.substring(0, 8)}...</td>
-                        <td>$${r.amountDue}</td>
-                        <td style="color: ${r.status==='已收款'?'green':'red'};">${r.status}</td>
-                        <td>${r.method || '-'}</td>
-                        <td>${r.details || '-'}</td>
-                        <td>
-                            ${r.status !== '已收款' ? `<button onclick="confirmPayment('${r.participantId}', ${r.amountDue})">確認收款</button>` : '已核帳'}
-                        </td>
-                     </tr>`;
-        });
-        html += `</table>`;
-        html += `<button onclick="finalizeFinances()" style="margin-top:15px; background: #f44336; color: white;">🔒 完成結算鎖定帳本</button>`;
-
-        const financeDiv = document.getElementById('financeSection');
-        financeDiv.style.display = 'block';
-        financeDiv.innerHTML = html;
-    } catch (e) {
-        alert(e.message);
-    }
-}
-
-// UC-07: 主揪確認單筆收款
-async function confirmPayment(participantId, amount) {
-    const res = await fetch(`/api/group-orders/${currentOrderId}/payments/confirm`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ participantId, amount })
-    });
-    if (res.ok) {
-        alert('已確認收款！');
-        manageFinances(); // 重新整理
-    } else {
-        alert(await res.text());
-    }
-}
-
-// UC-07: 最終結算鎖定
-async function finalizeFinances() {
-    if (!confirm('結算後將鎖定所有財務紀錄，無法再修改，確定嗎？')) return;
-    const res = await fetch(`/api/group-orders/${currentOrderId}/payments/finalize`, { method: 'POST' });
-    if (res.ok) {
-        alert('財務結算完成！');
-        document.getElementById('financeSection').style.display = 'none';
-    } else {
-        alert('結算失敗');
-    }
-}
-/**
- * UC-07: 個人裝置自動向後端查詢並顯示自己的付款狀態
- */
-async function fetchMyPaymentStatus(orderId) {
-    const participantId = getDeviceId();
-    try {
-        const res = await fetch(`/api/group-orders/${orderId}/payments/my-status?participantId=${participantId}`);
-        if (res.ok) {
-            const data = await res.json();
-            document.getElementById('myPaymentStatusCard').style.display = 'block';
-            document.getElementById('myDueAmount').textContent = `$${data.amountDue}`;
-
-            const statusLabel = document.getElementById('myPayStatus');
-            statusLabel.textContent = data.status;
-            if (data.status === '已付款') {
-                statusLabel.style.background = '#27ae60';
-            } else {
-                statusLabel.style.background = '#ff9800';
-            }
-        }
-    } catch (e) {
-        console.error("無法載入個人財務狀態", e);
-    }
-}
-
-/**
- * UC-07: 主揪切換顯示/隱藏財務對帳表格
- */
 function toggleFinanceTable() {
     const section = document.getElementById('hostFinanceSection');
-    if (section.style.display === 'none') {
-        loadHostFinanceTable();
+    if (section.style.display === 'none' || section.style.display === '') {
+        loadPublicFinanceTable();
     } else {
         section.style.display = 'none';
     }
 }
 
-/**
- * UC-07: 主揪向後端獲取對帳表格數據並渲染 (包含總額計算與備註功能)
- */
-async function loadHostFinanceTable() {
+async function loadPublicFinanceTable() {
     if (!currentOrderId) return alert('請先選擇一個團購');
-    const password = prompt('請輸入管理者密碼以開啟財務對帳表：');
-    if (!password) return;
 
     try {
-        const res = await fetch(`/api/group-orders/${currentOrderId}/payments/summary?password=${encodeURIComponent(password)}`);
+        const res = await fetch(`/api/group-orders/${currentOrderId}/payments/summary`);
         if (!res.ok) throw new Error(await res.text());
         const summaryData = await res.json();
 
-        // 1. 動態計算總實收與剩餘待繳金額
         let totalReceived = 0;
         let totalRemaining = 0;
         summaryData.forEach(r => {
-            if (r.status === '已付款') {
-                totalReceived += r.amountDue;
-            } else {
-                totalRemaining += r.amountDue;
-            }
+            if (r.status === '已付款') totalReceived += r.amountDue;
+            else totalRemaining += r.amountDue;
         });
 
-        // 2. 建立畫面上方的總額統計區塊
         let html = `
             <div style="display: flex; gap: 20px; background: #e8f5e9; padding: 15px; border-radius: 8px; margin-bottom: 15px; border: 1px solid #c8e6c9;">
                 <div style="font-size: 1.1rem; color: #2e7d32;">💰 總實收金額：<strong>$${totalReceived}</strong></div>
@@ -966,11 +828,11 @@ async function loadHostFinanceTable() {
             <table style="width: 100%; border-collapse: collapse; text-align: left; margin-top: 10px;">
                 <thead>
                     <tr style="background: #f5f5f5; border-bottom: 2px solid #ccc;">
-                        <th style="padding: 10px;">裝置 ID 與餐點內容</th>
+                        <th style="padding: 10px;">訂購人與餐點內容</th>
                         <th style="padding: 10px;">應付金額</th>
                         <th style="padding: 10px;">目前狀態</th>
                         <th style="padding: 10px;">備註 (多收/尚欠)</th>
-                        <th style="padding: 10px;">操作動作</th>
+                        <th style="padding: 10px;">主揪操作區</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -988,22 +850,22 @@ async function loadHostFinanceTable() {
             html += `
                 <tr style="border-bottom: 1px solid #eee;">
                     <td style="padding: 12px; max-width: 250px; word-wrap: break-word;">
-                        <div style="font-weight:bold; color:#1877f2; margin-bottom: 4px;">ID: ${record.participantId}</div>
+                        <div style="font-size:1.1rem; font-weight:bold; color:#1877f2; margin-bottom: 4px;">👤 ${record.payerName}</div>
                         ${itemsHtml}
                     </td>
-                    <td style="padding: 12px; font-weight:bold; color:#d32f2f;">$${record.amountDue}</td>
-                    <td style="padding: 12px;"><span style="color:white; background:${statusColor}; padding:3px 6px; border-radius:4px; font-size:0.85rem;">${record.status}</span></td>
+                    <td style="padding: 12px; font-weight:bold; color:#d32f2f; font-size:1.1rem;">$${record.amountDue}</td>
+                    <td style="padding: 12px;"><span style="color:white; background:${statusColor}; padding:4px 8px; border-radius:4px; font-weight:bold;">${record.status}</span></td>
 
                     <td style="padding: 12px;">
-                        <input type="text" id="remark-${record.participantId}" value="${record.remarks || ''}" placeholder="例如：找10元" style="width: 100px; padding: 5px;">
+                        <input type="text" id="remark-${record.payerName}" value="${record.remarks || ''}" placeholder="例如：找10元" style="width: 100px; padding: 5px; border-radius:4px; border:1px solid #ccc;">
                     </td>
 
                     <td style="padding: 12px; display: flex; flex-direction: column; gap: 5px;">
                         ${isPaid ?
-                            `<button class="action-btn" style="background:#e0e0e0; color:#333; padding:5px 10px; font-size:0.85rem;" onclick="updateUserPayStatus('${record.participantId}', '未付款')">取消核帳</button>` :
-                            `<button class="action-btn" style="background:#27ae60; color:white; padding:5px 10px; font-size:0.85rem;" onclick="updateUserPayStatus('${record.participantId}', '已付款')">確認收錢</button>`
+                            `<button class="action-btn" style="background:#e0e0e0; color:#333; padding:5px 10px; font-size:0.85rem;" onclick="promptPasswordAndUpdate('${record.payerName}', '未付款')">取消核帳</button>` :
+                            `<button class="action-btn" style="background:#27ae60; color:white; padding:5px 10px; font-size:0.85rem;" onclick="promptPasswordAndUpdate('${record.payerName}', '已付款')">確認收錢</button>`
                         }
-                        <button class="action-btn" style="background:#2196f3; color:white; padding:5px 10px; font-size:0.85rem;" onclick="updateUserPayStatus('${record.participantId}', '${record.status}')">💾 儲存備註</button>
+                        <button class="action-btn" style="background:#2196f3; color:white; padding:5px 10px; font-size:0.85rem;" onclick="promptPasswordAndUpdate('${record.payerName}', '${record.status}')">💾 儲存備註</button>
                     </td>
                 </tr>
             `;
@@ -1016,100 +878,41 @@ async function loadHostFinanceTable() {
         alert(e.message);
     }
 }
-//async function loadHostFinanceTable() {
-//    if (!currentOrderId) return alert('請先選擇一個團購');
-//    const password = prompt('請輸入管理者密碼以開啟財務對帳表：');
-//    if (!password) return;
-//
-//    // 驗證管理者密碼是否正確
-//    const verifyRes = await fetch(`/api/group-orders/close/${currentOrderId}`, {
-//        method: 'POST',
-//        headers: { 'Content-Type': 'application/json' },
-//        body: JSON.stringify({ password: password })
-//    });
-//
-//    // 注意：因密碼驗證在原架構會順便把狀態改為「已結單」，此處僅借用驗證邏輯，若密碼錯誤會回傳 400
-//    if (!verifyRes.ok && verifyRes.status === 400) {
-//        return alert('密碼錯誤，拒絕存取財務資料！');
-//    }
-//
-//    try {
-//        const res = await fetch(`/api/group-orders/${currentOrderId}/payments/summary`);
-//        if (!res.ok) throw new Error("載入失敗");
-//        const summaryData = await res.json();
-//
-//        let html = `
-//            <table style="width: 100%; border-collapse: collapse; text-align: left; margin-top: 10px;">
-//                <thead>
-//                    <tr style="background: #f5f5f5; border-bottom: 2px solid #ccc;">
-//                        <th style="padding: 10px;">訂購者與餐點內容</th>
-//                        <th style="padding: 10px;">應付金額</th>
-//                        <th style="padding: 10px;">目前狀態</th>
-//                        <th style="padding: 10px;">操作動作</th>
-//                    </tr>
-//                </thead>
-//                <tbody>
-//        `;
-//
-//        if (summaryData.length === 0) {
-//            html += `<tr><td colspan="4" style="padding:15px; text-color:#666;">目前尚無任何人點餐，無法對帳。</td></tr>`;
-//        }
-//
-//        summaryData.forEach(record => {
-//            const itemsHtml = record.details.map(item => `<div style="font-size:0.9rem; color:#555;">• ${item}</div>`).join('');
-//            const isPaid = record.status === '已付款';
-//            const statusColor = isPaid ? '#27ae60' : '#ff9800';
-//
-//            html += `
-//                <tr style="border-bottom: 1px solid #eee;">
-//                    <td style="padding: 12px;">
-//                        <span style="font-weight:bold; color:#1877f2;">裝置 ID: ${record.participantId.substring(0,8)}...</span>
-//                        ${itemsHtml}
-//                    </td>
-//                    <td style="padding: 12px; font-weight:bold; color:#d32f2f;">$${record.amountDue}</td>
-//                    <td style="padding: 12px;"><span style="color:white; background:${statusColor}; padding:3px 6px; border-radius:4px; font-size:0.85rem;">${record.status}</span></td>
-//                    <td style="padding: 12px;">
-//                        ${isPaid ?
-//                            `<button class="action-btn" style="background:#e0e0e0; color:#333; padding:5px 10px; font-size:0.85rem;" onclick="updateUserPayStatus('${record.participantId}', '未付款')">設為未付</button>` :
-//                            `<button class="action-btn" style="background:#27ae60; color:white; padding:5px 10px; font-size:0.85rem;" onclick="updateUserPayStatus('${record.participantId}', '已付款')">確認收錢</button>`
-//                        }
-//                    </td>
-//                </tr>
-//            `;
-//        });
-//
-//        html += `</tbody></table>`;
-//        document.getElementById('financeTableContainer').innerHTML = html;
-//        document.getElementById('hostFinanceSection').style.display = 'block';
-//    } catch (e) {
-//        alert("無法讀取對帳表資料");
-//    }
-//}
 
-/**
- * UC-07: 主揪點擊更改某人的付款狀態或儲存備註
- */
-async function updateUserPayStatus(participantId, newStatus) {
-    // 抓取當下輸入框內的備註文字
-    const remarkInput = document.getElementById(`remark-${participantId}`);
+async function promptPasswordAndUpdate(payerName, newStatus) {
+    const password = prompt(`要修改【${payerName}】的財務狀態，請輸入主揪密碼：`);
+    if (!password) return;
+
+    const remarkInput = document.getElementById(`remark-${payerName}`);
     const remarks = remarkInput ? remarkInput.value : '';
 
     try {
-        const res = await fetch(`/api/group-orders/${currentOrderId}/payments/status?participantId=${encodeURIComponent(participantId)}&status=${encodeURIComponent(newStatus)}&remarks=${encodeURIComponent(remarks)}`, {
+        const res = await fetch(`/api/group-orders/${currentOrderId}/payments/status?payerName=${encodeURIComponent(payerName)}&status=${encodeURIComponent(newStatus)}&remarks=${encodeURIComponent(remarks)}&password=${encodeURIComponent(password)}`, {
             method: 'PUT'
         });
         if (res.ok) {
-            // 更新成功後，重新拉取資料刷新表格 (同時會重新計算上方的總金額)
-            // 這裡不再需要重問密碼，因為資料重新渲染速度很快，可以達到類似即時更新的效果
-            // *注意：由於 loadHostFinanceTable 內有密碼 prompt，為避免無限彈窗，我們可以暫時將就，
-            // 或是請主揪再次輸入密碼。為求體驗，我們這裡簡單 alert 提示即可，或需要主揪手動再點開對帳表。
-            alert("狀態與備註更新成功！");
-            document.getElementById('hostFinanceSection').style.display = 'none'; // 先收起，逼迫重刷，或者你有暫存密碼機制就更好
-            fetchMyPaymentStatus(currentOrderId);
+            loadPublicFinanceTable();
         } else {
-            alert("更新失敗");
+            alert(await res.text());
         }
     } catch (e) {
         alert("連線異常");
     }
+}
+
+// 輸出給 Jest 測試使用
+if (typeof module !== 'undefined' && module.exports) {
+    module.exports = {
+        submitOrderItem,
+        submitDraftOrders,
+        clearDraftOrders,
+        adminAction,
+        goToItemView,
+        deleteOrderItem,
+        startEditDraftItem,
+        startEditSubmittedItem,
+        buildOrderPayload,
+        loadLocalOrderRecords,
+        loadDraftOrderRecords
+    };
 }

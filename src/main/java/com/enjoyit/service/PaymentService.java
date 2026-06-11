@@ -15,35 +15,24 @@ public class PaymentService {
         this.groupOrderRepository = groupOrderRepository;
     }
 
-    public List<Map<String, Object>> getFinanceSummary(String orderId, String password) {
+    // 【修改】移除密碼檢查，開放所有人調用總表
+    public List<Map<String, Object>> getFinanceSummary(String orderId) {
+        GroupOrder order = groupOrderRepository.findById(orderId)
+                .orElseThrow(() -> new IllegalArgumentException("找不到該訂單"));
+        return order.getFinanceSummary();
+    }
+
+    // 【修改】將密碼檢查移到這裡，只有主揪能改狀態
+    public void updatePaymentStatus(String orderId, String payerName, String status, String remarks, String password) {
         GroupOrder order = groupOrderRepository.findById(orderId)
                 .orElseThrow(() -> new IllegalArgumentException("找不到該訂單"));
 
         // 核對主揪管理者密碼
         if (order.getAdminPassword() == null || !order.getAdminPassword().equals(password)) {
-            throw new IllegalArgumentException("密碼錯誤，拒絕存取財務資料！");
+            throw new IllegalArgumentException("密碼錯誤，拒絕修改財務狀態！");
         }
 
-        return order.getFinanceSummary();
-    }
-
-//    public void updatePaymentStatus(String orderId, String participantId, String status) {
-//        GroupOrder order = groupOrderRepository.findById(orderId)
-//                .orElseThrow(() -> new IllegalArgumentException("找不到該訂單"));
-//        order.updatePaymentStatus(participantId, status);
-//        groupOrderRepository.save(order); // 狀態變更後存回記憶體 Repository
-//    }
-    // 【修改】參數增加 String remarks
-    public void updatePaymentStatus(String orderId, String participantId, String status, String remarks) {
-        GroupOrder order = groupOrderRepository.findById(orderId)
-                .orElseThrow(() -> new IllegalArgumentException("找不到該訂單"));
-        order.updatePaymentStatus(participantId, status, remarks); // 傳入 remarks
+        order.updatePaymentStatus(payerName, status, remarks);
         groupOrderRepository.save(order);
-    }
-
-    public Map<String, Object> getParticipantStatus(String orderId, String participantId) {
-        GroupOrder order = groupOrderRepository.findById(orderId)
-                .orElseThrow(() -> new IllegalArgumentException("找不到該訂單"));
-        return order.getSingleParticipantStatus(participantId);
     }
 }

@@ -102,26 +102,33 @@ public class GroupOrderController {
     public ResponseEntity<?> addOrderItemsBatch(
             @PathVariable String orderId,
             @RequestParam String groupId,
-            @RequestBody OrderItemsBatchRequest request) {
+            // 🌟 關鍵修正：棄用 OrderItemsBatchRequest，直接使用 Map 接收，100% 解決反序列化報錯
+            @RequestBody Map<String, List<com.enjoyit.domain.OrderItem>> requestBody) {
+
         GroupOrder order = requireOrder(orderId, groupId);
         String closedMessage = getClosedOrderMessage(order);
         if (closedMessage != null) {
             return ResponseEntity.badRequest().body(closedMessage);
         }
-        if (request == null || request.getItems() == null || request.getItems().isEmpty()) {
+
+        // 從 Map 中取出 items 陣列
+        List<com.enjoyit.domain.OrderItem> items = requestBody.get("items");
+
+        if (items == null || items.isEmpty()) {
             return ResponseEntity.badRequest().body("待送出的餐點不能為空");
         }
 
-        for (com.enjoyit.domain.OrderItem item : request.getItems()) {
+        // 驗證每一筆資料
+        for (com.enjoyit.domain.OrderItem item : items) {
             String validationMessage = validateOrderItem(item);
             if (validationMessage != null) {
                 return ResponseEntity.badRequest().body(validationMessage);
             }
         }
 
-        order.getOrderItems().addAll(request.getItems());
+        order.getOrderItems().addAll(items);
         groupOrderRepository.save(order);
-        return ResponseEntity.ok(request.getItems());
+        return ResponseEntity.ok(items);
     }
 
     @PutMapping("/{orderId}/items/{itemId}")

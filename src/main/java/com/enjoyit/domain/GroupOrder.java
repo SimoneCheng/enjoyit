@@ -65,114 +65,75 @@ public class GroupOrder {
     // ==========================================================
 
     /**
-     * 功能 1 核心邏輯：動態計算最新點餐品項總額，並回傳主揪對帳表專用的資料結構
+     * 動態計算最新點餐品項總額 (改為依據 orderFor 訂購人姓名來分群)
      */
     public List<Map<String, Object>> getFinanceSummary() {
         Map<String, Integer> totalMap = new HashMap<>();
         Map<String, List<String>> itemsMap = new HashMap<>();
 
-        // 1. 遍歷當前訂單內的所有餐點品項，按參與者裝置(participantId)進行分類與金額累加
+        // 1. 遍歷訂單，按「實際訂購人姓名」分類
         for (OrderItem item : orderItems) {
-            String pId = item.getParticipantId();
-            if (pId == null) continue;
+            // 如果沒填名字，統一歸類為 "未命名"
+            String payer = (item.getOrderFor() == null || item.getOrderFor().trim().isEmpty())
+                    ? "未命名" : item.getOrderFor().trim();
 
-            // 累加該裝置的應付總金額
-            totalMap.put(pId, totalMap.getOrDefault(pId, 0) + item.getOrderTotalPrice());
+            totalMap.put(payer, totalMap.getOrDefault(payer, 0) + item.getOrderTotalPrice());
 
-            // 組合餐點明細字串：例如 "王小明: 珍珠奶茶 x1 [半糖, 去冰]"
-            String itemDesc = item.getOrderFor() + ": " + item.getItemName() + " x" + item.getQuantity();
+            String itemDesc = item.getItemName() + " x" + item.getQuantity();
             if (item.getCustomizations() != null && !item.getCustomizations().isEmpty()) {
                 itemDesc += " " + item.getCustomizations().toString();
             }
-            itemsMap.computeIfAbsent(pId, k -> new ArrayList<>()).add(itemDesc);
+            itemsMap.computeIfAbsent(payer, k -> new ArrayList<>()).add(itemDesc);
         }
 
-        // 2. 同步維護內部的 paymentRecords 狀態，確保主揪勾選的「已付款」狀態不會因為使用者加點刷新而消失
+        // 2. 更新財務紀錄狀態
         List<PaymentRecord> updatedRecords = new ArrayList<>();
-        for (String pId : totalMap.keySet()) {
-            final String currentPid = pId;
+        for (String payer : totalMap.keySet()) {
+            final String currentPayer = payer;
             PaymentRecord existing = this.paymentRecords.stream()
-                    .filter(r -> r.getParticipantId().equals(currentPid))
+                    .filter(r -> r.getPayerName().equals(currentPayer))
                     .findFirst()
                     .orElse(null);
 
             if (existing == null) {
-                // 如果是第一次點餐的裝置，建立全新的財務紀錄（預設未付款）
-                existing = new PaymentRecord(pId, totalMap.get(pId));
+                existing = new PaymentRecord(payer, totalMap.get(payer));
             } else {
-                // 如果是已有紀錄的裝置，僅更新其最新應付金額
-                existing.setAmountDue(totalMap.get(pId));
+                existing.setAmountDue(totalMap.get(payer));
             }
             updatedRecords.add(existing);
         }
         this.paymentRecords = updatedRecords;
 
-        // 3. 包裝成前端直觀對帳表格所需的結構 (List<Map>)
+        // 3. 包裝給前端
         List<Map<String, Object>> summaryList = new ArrayList<>();
         for (PaymentRecord record : this.paymentRecords) {
             Map<String, Object> map = new HashMap<>();
-            map.put("participantId", record.getParticipantId());
+            map.put("payerName", record.getPayerName());
             map.put("amountDue", record.getAmountDue());
             map.put("status", record.getStatus());
-            map.put("remarks", record.getRemarks()); // 【新增這行】將備註傳給前端
-            map.put("details", itemsMap.getOrDefault(record.getParticipantId(), new ArrayList<>()));
+            map.put("remarks", record.getRemarks());
+            map.put("details", itemsMap.getOrDefault(record.getPayerName(), new ArrayList<>()));
             summaryList.add(map);
         }
         return summaryList;
     }
 
     /**
-     * 功能 1 核心邏輯：由主揪在表格中點擊按鈕，一鍵切換變更付款狀態
+     * 更新指定訂購人的付款狀態
      */
-//    public void updatePaymentStatus(String participantId, String status) {
-//        final String currentPid = participantId;
-//        PaymentRecord record = this.paymentRecords.stream()
-//                .filter(r -> r.getParticipantId().equals(currentPid))
-//                .findFirst()
-//                .orElseThrow(() -> new IllegalArgumentException("找不到該參與者的帳單項目"));
-//
-//        if ("已付款".equals(status)) {
-//            record.markAsPaid();
-//        } else {
-//            record.markAsUnpaid();
-//        }
-//    }
-    // 【修改】多接收一個 remarks 參數
-    public void updatePaymentStatus(String participantId, String status, String remarks) {
-        final String currentPid = participantId;
+    public void updatePaymentStatus(String payerName, String status, String remarks) {
+        final String currentPayer = payerName;
         PaymentRecord record = this.paymentRecords.stream()
-                .filter(r -> r.getParticipantId().equals(currentPid))
+                .filter(r -> r.getPayerName().equals(currentPayer))
                 .findFirst()
-                .orElseThrow(() -> new IllegalArgumentException("找不到該參與者的帳單項目"));
+                .orElseThrow(() -> new IllegalArgumentException("找不到該訂購人的帳單項目"));
 
         if ("已付款".equals(status)) {
             record.markAsPaid();
         } else {
             record.markAsUnpaid();
         }
-        record.setRemarks(remarks); // 【新增】同時更新備註
-    }
-
-    /**
-     * 功能 2 核心邏輯：供一般使用者裝置(個人網頁)即時查詢自己這台裝置當前的應付總額與核帳狀態
-     */
-    public Map<String, Object> getSingleParticipantStatus(String participantId) {
-        getFinanceSummary(); // 每次查詢前強制刷新對帳單，確保拿到最即時的加點金額
-        final String currentPid = participantId;
-        PaymentRecord record = this.paymentRecords.stream()
-                .filter(r -> r.getParticipantId().equals(currentPid))
-                .findFirst()
-                .orElse(null);
-
-        Map<String, Object> result = new HashMap<>();
-        if (record != null) {
-            result.put("amountDue", record.getAmountDue());
-            result.put("status", record.getStatus());
-        } else {
-            result.put("amountDue", 0);
-            result.put("status", "無點餐紀錄");
-        }
-        return result;
+        record.setRemarks(remarks);
     }
 
     // 財務紀錄清單的 Getter & Setter

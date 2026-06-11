@@ -1,26 +1,26 @@
 package com.enjoyit.domain;
 
 public class PaymentRecord {
-    private String participantId;
+    private String payerName; // 【修改】改為依據訂購人姓名
     private int amountDue;
-    private String status; // "未付款" 或 "已付款"
-    private String remarks; // 【新增】備註欄位，用來記錄多收找零或尚欠金額
+    private String status;
+    private String remarks;
 
     public PaymentRecord() {}
 
-    public PaymentRecord(String participantId, int amountDue) {
-        this.participantId = participantId;
+    public PaymentRecord(String payerName, int amountDue) {
+        this.payerName = payerName;
         this.amountDue = amountDue;
         this.status = "未付款";
-        this.remarks = ""; // 預設為空字串
+        this.remarks = "";
     }
 
     public void markAsPaid() { this.status = "已付款"; }
     public void markAsUnpaid() { this.status = "未付款"; }
 
     // Getters and Setters
-    public String getParticipantId() { return participantId; }
-    public void setParticipantId(String participantId) { this.participantId = participantId; }
+    public String getPayerName() { return payerName; }
+    public void setPayerName(String payerName) { this.payerName = payerName; }
     public int getAmountDue() { return amountDue; }
     public void setAmountDue(int amountDue) { this.amountDue = amountDue; }
     public String getStatus() { return status; }
