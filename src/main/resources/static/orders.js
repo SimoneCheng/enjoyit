@@ -1,5 +1,7 @@
 let currentOrderId = null;
 let currentVendorId = null;
+let currentOrderDeadline = null;
+let deadlineTimer = null;
 let editingTarget = null;
 
 const DEVICE_KEY = 'enjoyit-device-id';
@@ -9,6 +11,8 @@ const DRAFT_CACHE_PREFIX = 'enjoyit-draft-order-items';
 window.dashboardModules = window.dashboardModules || [];
 window.dashboardModules.push(() => {
     refreshList();
+    if (deadlineTimer) clearInterval(deadlineTimer);
+    deadlineTimer = setInterval(checkDeadlineRealTime, 1000);
 });
 
 window.handleOrdersSectionShown = async function handleOrdersSectionShown() {
@@ -25,6 +29,32 @@ window.onMenuUpdated = async function onMenuUpdated(vendorId) {
         await goToItemView(currentOrderId);
     }
 };
+
+function checkDeadlineRealTime() {
+    if (!currentOrderDeadline || !currentOrderId) return;
+
+    const now = new Date();
+    const deadline = new Date(currentOrderDeadline);
+    if (now <= deadline) return;
+
+    const deadlineDisplay = document.getElementById('deadlineDisplay');
+    const closeBtn = document.getElementById('closeOrderBtn');
+
+    if (deadlineDisplay && !deadlineDisplay.textContent.includes('已截止')) {
+        deadlineDisplay.textContent = '截止時間：已截止';
+        deadlineDisplay.style.color = 'red';
+    }
+
+    if (closeBtn && !closeBtn.disabled) {
+        closeBtn.textContent = '團購已截止';
+        closeBtn.disabled = true;
+        closeBtn.classList.add('disabled');
+    }
+
+    if (currentVendorId) {
+        loadOrderMenu(currentVendorId, true);
+    }
+}
 
 function getDeviceId() {
     if (typeof localStorage === 'undefined') {
@@ -222,6 +252,7 @@ async function goToItemView(orderId) {
         if (!res.ok) return;
         const order = await res.json();
         currentVendorId = order.vendorId;
+        currentOrderDeadline = order.deadline;
 
         viewingTitle.textContent = '團購： ' + order.orderInfo;
         document.getElementById('orderAnnouncementDisplay').textContent = '📢 公告：' + (order.announcement || '無公告');

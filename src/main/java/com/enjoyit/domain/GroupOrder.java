@@ -44,7 +44,13 @@ public class GroupOrder {
     public void setOrderInfo(String orderInfo) { this.orderInfo = orderInfo; }
     public void setOrderId(String orderId) { this.orderId = orderId; }
 
-    public String getStatus() { return status; }
+    public String getStatus() {
+        // 如果目前狀態為「進行中」，但截止時間已過，則動態回傳「已結單」
+        if ("進行中".equals(status) && deadline != null && LocalDateTime.now().isAfter(deadline)) {
+            return "已結單";
+        }
+        return status;
+    }
     public List<OrderItem> getOrderItems() { return orderItems; }
     public String getOrderInfo() { return orderInfo; }
     public String getOrderId() { return orderId; }

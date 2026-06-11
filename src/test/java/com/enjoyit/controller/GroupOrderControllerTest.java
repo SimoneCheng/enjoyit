@@ -15,14 +15,23 @@ import java.util.Map;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
+import com.enjoyit.repository.InMemoryGroupOrderRepository;
+import com.enjoyit.service.GroupOrderService;
+import com.enjoyit.service.PasswordValidator;
+
 class GroupOrderControllerTest {
 
     private MockMvc mockMvc;
     private ObjectMapper objectMapper = new ObjectMapper();
+    private GroupOrderService groupOrderService;
 
     @BeforeEach
     void setUp() {
-        mockMvc = MockMvcBuilders.standaloneSetup(new GroupOrderController())
+        PasswordValidator passwordValidator = new PasswordValidator();
+        InMemoryGroupOrderRepository repository = new InMemoryGroupOrderRepository();
+        groupOrderService = new GroupOrderService(passwordValidator, repository);
+
+        mockMvc = MockMvcBuilders.standaloneSetup(new GroupOrderController(groupOrderService))
                 // 👇 直接抽換底層的訊息轉換器
                 .setMessageConverters(
                         new StringHttpMessageConverter(StandardCharsets.UTF_8),
@@ -77,6 +86,7 @@ class GroupOrderControllerTest {
         publishReq.put("orderInfo", "測試防護網團購");
         publishReq.put("groupId", "secure_group");
         publishReq.put("adminPassword", "1234");
+        publishReq.put("vendorId", "vendor_001");
 
         // 執行發起 API，並把回傳的 orderId 抓出來存進變數
         String orderId = mockMvc.perform(post("/api/group-orders/publish")
@@ -110,6 +120,7 @@ class GroupOrderControllerTest {
         publishReq.put("orderInfo", "命名驗證團購");
         publishReq.put("groupId", "naming_group");
         publishReq.put("adminPassword", "1234");
+        publishReq.put("vendorId", "vendor_001");
 
         String orderId = mockMvc.perform(post("/api/group-orders/publish")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -133,6 +144,7 @@ class GroupOrderControllerTest {
         publishReq.put("orderInfo", "編輯餐點團購");
         publishReq.put("groupId", "edit_group");
         publishReq.put("adminPassword", "1234");
+        publishReq.put("vendorId", "vendor_001");
 
         String orderId = mockMvc.perform(post("/api/group-orders/publish")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -172,6 +184,7 @@ class GroupOrderControllerTest {
         publishReq.put("orderInfo", "批次點餐團購");
         publishReq.put("groupId", "batch_group");
         publishReq.put("adminPassword", "1234");
+        publishReq.put("vendorId", "vendor_001");
 
         String orderId = mockMvc.perform(post("/api/group-orders/publish")
                         .contentType(MediaType.APPLICATION_JSON)
