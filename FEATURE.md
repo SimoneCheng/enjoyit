@@ -4,7 +4,7 @@
 
 ## 第一階段：模型與儲存層 (Domain & Repository) TDD
 
-- [x] **1.1 更新領域模型 `Vendor.java`**
+- [x] **1.1 更新領域模型 `Vendor.java`**ge
     - 新增 `phone`, `address`, `businessHours`, `isActive` 欄位。
     - 實作必要的 Getter/Setter。
 - [x] **1.2 編寫儲存層測試 `VendorRepositoryTest.java`**
@@ -52,13 +52,3 @@
 - [x] **5.2 功能手動測試驗證**
     - 驗證重複店家檢查邏輯。
     - 驗證進行中訂單保護刪除邏輯。
-
-## 第五階段：店家與菜單關聯 (Store-Menu Linkage)
-
-- [x] **5.1 串接店家與菜單跳轉**
-    - 在 `vendor.js` 列表新增「菜單」按鈕。
-    - 點擊按鈕後帶入 `vendorId` 參數導向至菜單管理頁 (`/dashboard/menu?vendorId=...`)。
-- [x] **5.2 實作菜單動態載入**
-    - 修改 `menu.js` 邏輯，從 URL 參數獲取 `vendorId`。
-    - 根據 `vendorId` 向後端請求該店家的專屬菜單。
-

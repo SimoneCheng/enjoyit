@@ -8,16 +8,15 @@ async function fetchVendorsForMenu() {
     const initialVendorId = urlParams.get('vendorId');
 
     try {
-        const response = await fetch('/api/vendors');
+        const response = await fetch('/api/vendors?activeOnly=true');
         const vendors = await response.json();
         
         const currentVal = select.value || initialVendorId;
         
         if (vendors && vendors.length > 0) {
             select.innerHTML = '<option value="">-- 請選擇管理店家 --</option>' + 
-                vendors.map(v => `
-                    <option value="${v.id}" ${currentVal === v.id ? 'selected' : ''}>${v.name}</option>
-                `).join('');
+                vendors.map(v => `<option value="${v.id}">${v.name}</option>`).join('');
+
 
             // 如果選單已有值但編輯器未初始化，則嘗試初始化
             const activeVendorId = select.value;

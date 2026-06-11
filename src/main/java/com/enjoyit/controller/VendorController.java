@@ -19,9 +19,11 @@ public class VendorController {
     }
 
     @GetMapping
-    public List<Vendor> getAllVendors() {
-        // 回傳所有啟用的店家，供任一群組選擇
-        return vendorService.getAllActiveVendors();
+    public List<Vendor> getVendors(@RequestParam(required = false, defaultValue = "false") boolean activeOnly) {
+        if (activeOnly) {
+            return vendorService.getAllActiveVendors();
+        }
+        return vendorService.getAllVendors();
     }
 
     @PostMapping
@@ -40,8 +42,7 @@ public class VendorController {
             id,
             request.get("name"),
             request.get("phone"),
-            request.get("address"),
-            request.get("businessHours")
+            request.get("address")
         );
         return ResponseEntity.ok("店家資訊已更新");
     }
@@ -51,4 +52,10 @@ public class VendorController {
         vendorService.deleteVendor(id);
         return ResponseEntity.ok("店家已成功下架");
     }
-}
+
+    @PostMapping("/{id}/status")
+    public ResponseEntity<String> setVendorStatus(@PathVariable String id, @RequestParam boolean active) {
+        vendorService.setVendorActiveStatus(id, active);
+        return ResponseEntity.ok(active ? "店家已成功上架" : "店家已成功下架");
+    }
+    }

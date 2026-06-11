@@ -7,7 +7,6 @@ public class Vendor {
     private String name;
     private String phone;
     private String address;
-    private String businessHours;
     private boolean isActive;
     private Menu menu;
 
@@ -29,8 +28,6 @@ public class Vendor {
     public void setPhone(String phone) { this.phone = phone; }
     public String getAddress() { return address; }
     public void setAddress(String address) { this.address = address; }
-    public String getBusinessHours() { return businessHours; }
-    public void setBusinessHours(String businessHours) { this.businessHours = businessHours; }
     public boolean isActive() { return isActive; }
     public void setActive(boolean active) { isActive = active; }
     public Menu getMenu() { return menu; }

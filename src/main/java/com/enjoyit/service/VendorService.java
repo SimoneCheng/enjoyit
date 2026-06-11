@@ -21,6 +21,10 @@ public class VendorService {
         return vendorRepository.findAllActive();
     }
 
+    public List<Vendor> getAllVendors() {
+        return vendorRepository.findAll();
+    }
+
     public Vendor createVendor(String name, String phone, String address) {
         validateVendorFields(name, phone, address);
         
@@ -33,7 +37,7 @@ public class VendorService {
         return vendor;
     }
 
-    public void updateVendor(String id, String name, String phone, String address, String businessHours) {
+    public void updateVendor(String id, String name, String phone, String address) {
         Vendor vendor = vendorRepository.findById(id).orElse(null);
         if (vendor == null) {
             throw new IllegalArgumentException("找不到店家");
@@ -44,13 +48,16 @@ public class VendorService {
         vendor.setName(name);
         vendor.setPhone(phone);
         vendor.setAddress(address);
-        vendor.setBusinessHours(businessHours);
         
         vendorRepository.save(vendor);
     }
 
     public void deleteVendor(String id) {
-        if (groupOrderService.hasOngoingOrdersByVendor(id)) {
+        setVendorActiveStatus(id, false);
+    }
+
+    public void setVendorActiveStatus(String id, boolean active) {
+        if (!active && groupOrderService.hasOngoingOrdersByVendor(id)) {
             throw new IllegalStateException("有團購在使用此店家，不得下架或刪除");
         }
 
@@ -59,7 +66,7 @@ public class VendorService {
             throw new IllegalArgumentException("找不到店家");
         }
         
-        vendor.setActive(false);
+        vendor.setActive(active);
         vendorRepository.save(vendor);
     }
 

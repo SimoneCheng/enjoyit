@@ -32,10 +32,10 @@ class VendorControllerTest {
     private ObjectMapper objectMapper;
 
     @Test
-    @DisplayName("GET /api/vendors：應回傳所有啟用中的店家，供任一群組選擇")
+    @DisplayName("GET /api/vendors：應回傳所有店家資訊，供後台管理使用")
     void testGetAllVendors() throws Exception {
         Vendor v = new Vendor("店家A", "02-123", "地址A");
-        when(vendorService.getAllActiveVendors()).thenReturn(List.of(v));
+        when(vendorService.getAllVendors()).thenReturn(List.of(v));
 
         mockMvc.perform(get("/api/vendors"))
                 .andExpect(status().isOk())
@@ -65,8 +65,7 @@ class VendorControllerTest {
         Map<String, String> request = Map.of(
             "name", "更名店家",
             "phone", "0922",
-            "address", "新地址",
-            "businessHours", "09:00-18:00"
+            "address", "新地址"
         );
 
         mockMvc.perform(put("/api/vendors/v123")
@@ -74,7 +73,7 @@ class VendorControllerTest {
                 .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isOk());
 
-        verify(vendorService, times(1)).updateVendor(eq("v123"), eq("更名店家"), eq("0922"), eq("新地址"), eq("09:00-18:00"));
+        verify(vendorService, times(1)).updateVendor(eq("v123"), eq("更名店家"), eq("0922"), eq("新地址"));
     }
 
     @Test

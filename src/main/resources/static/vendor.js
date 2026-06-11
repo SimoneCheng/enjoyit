@@ -22,17 +22,49 @@ function renderVendorTable() {
     if (!tbody) return;
     
     tbody.innerHTML = allVendors.map(v => `
-        <tr>
+        <tr style="${v.active ? '' : 'background-color: #f9f9f9; color: #999;'}">
             <td>${v.name}</td>
             <td>${v.phone}</td>
             <td>${v.address}</td>
-            <td>${v.businessHours || '-'}</td>
+            <td>
+                <span style="color: ${v.active ? 'green' : 'red'}; font-weight: bold;">
+                    ${v.active ? '● 營業中' : '○ 已下架'}
+                </span>
+            </td>
             <td>
                 <button class="small-btn" onclick="openVendorForm('${v.id}')">編輯</button>
-                <button class="small-btn danger" onclick="deleteVendor('${v.id}')">下架</button>
+                ${v.active 
+                    ? `<button class="small-btn danger" onclick="toggleVendorStatus('${v.id}', false)">下架</button>`
+                    : `<button class="small-btn info" onclick="toggleVendorStatus('${v.id}', true)">上架</button>`
+                }
             </td>
         </tr>
     `).join('');
+}
+
+async function toggleVendorStatus(id, shouldActive) {
+    const action = shouldActive ? '上架' : '下架';
+    if (!confirm(`確定要${action}此店家嗎？`)) return;
+
+    try {
+        const response = await fetch(`/api/vendors/${id}/status?active=${shouldActive}`, { method: 'POST' });
+        
+        if (response.ok) {
+            alert(`店家已${action}`);
+            fetchVendors();
+            if (typeof window.fetchVendorsForPublish === 'function') {
+                window.fetchVendorsForPublish();
+            }
+            if (typeof window.fetchVendorsForMenu === 'function') {
+                window.fetchVendorsForMenu();
+            }
+        } else {
+            const errorMsg = await response.text();
+            alert(`${action}失敗: ${errorMsg}`);
+        }
+    } catch (error) {
+        alert('連線錯誤');
+    }
 }
 
 function openVendorForm(id = null) {
@@ -50,7 +82,6 @@ function openVendorForm(id = null) {
             document.getElementById('vendorName').value = vendor.name;
             document.getElementById('vendorPhone').value = vendor.phone;
             document.getElementById('vendorAddress').value = vendor.address;
-            document.getElementById('vendorHours').value = vendor.businessHours || '';
         }
     } else {
         title.innerText = '新增店家';
@@ -70,7 +101,6 @@ async function handleVendorSubmit(event) {
     const name = document.getElementById('vendorName').value;
     const phone = document.getElementById('vendorPhone').value;
     const address = document.getElementById('vendorAddress').value;
-    const businessHours = document.getElementById('vendorHours').value;
 
     const method = id ? 'PUT' : 'POST';
     const url = id ? `/api/vendors/${id}` : '/api/vendors';
@@ -79,7 +109,7 @@ async function handleVendorSubmit(event) {
         const response = await fetch(url, {
             method: method,
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ name, phone, address, businessHours })
+            body: JSON.stringify({ name, phone, address })
         });
 
         if (response.ok) {
@@ -96,29 +126,6 @@ async function handleVendorSubmit(event) {
         } else {
             const errorMsg = await response.text();
             alert('操作失敗: ' + errorMsg);
-        }
-    } catch (error) {
-        alert('連線錯誤');
-    }
-}
-
-async function deleteVendor(id) {
-    if (!confirm('確定要下架此店家嗎？下架後將無法在新的團購中選擇。')) return;
-
-    try {
-        const response = await fetch(`/api/vendors/${id}`, { method: 'DELETE' });
-        if (response.ok) {
-            alert('店家已下架');
-            fetchVendors();
-            if (typeof window.fetchVendorsForPublish === 'function') {
-                window.fetchVendorsForPublish();
-            }
-            if (typeof window.fetchVendorsForMenu === 'function') {
-                window.fetchVendorsForMenu();
-            }
-        } else {
-            const errorMsg = await response.text();
-            alert('下架失敗: ' + errorMsg);
         }
     } catch (error) {
         alert('連線錯誤');

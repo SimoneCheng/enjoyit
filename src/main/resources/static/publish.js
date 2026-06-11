@@ -57,14 +57,18 @@ async function fetchVendorsForPublish() {
     if (!select) return;
 
     try {
-        const response = await fetch('/api/vendors');
+        const response = await fetch('/api/vendors?activeOnly=true');
         const vendors = await response.json();
         
         const currentVal = select.value;
-        select.innerHTML = '<option value="">-- 請選擇店家 --</option>' + 
-            vendors.map(v => `<option value="${v.id}">${v.name}</option>`).join('');
-        
-        if (currentVal) select.value = currentVal;
+        if (vendors && vendors.length > 0) {
+            select.innerHTML = '<option value="">-- 請選擇店家 --</option>' + 
+                vendors.map(v => `<option value="${v.id}">${v.name}</option>`).join('');
+            
+            if (currentVal) select.value = currentVal;
+        } else {
+            select.innerHTML = '<option value="">-- 暫無上架店家 --</option>';
+        }
     } catch (e) {
         console.error('無法載入店家清單:', e);
     }
