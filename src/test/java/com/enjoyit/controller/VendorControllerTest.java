@@ -85,4 +85,15 @@ class VendorControllerTest {
 
         verify(vendorService, times(1)).deleteVendor("v123");
     }
+
+    @Test
+    @DisplayName("POST /api/vendors/{id}/status：有進行中訂單時下架應回傳 400 並提示錯誤")
+    void testSetVendorStatus_OngoingOrders() throws Exception {
+        doThrow(new IllegalStateException("有團購在使用此店家，不得下架或刪除"))
+            .when(vendorService).setVendorActiveStatus("v123", false);
+
+        mockMvc.perform(post("/api/vendors/v123/status?active=false"))
+                .andExpect(status().isBadRequest())
+                .andExpect(content().string("有團購在使用此店家，不得下架或刪除"));
+    }
 }

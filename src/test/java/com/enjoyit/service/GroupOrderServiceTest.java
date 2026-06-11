@@ -12,32 +12,34 @@ import static org.mockito.Mockito.when;
 
 class GroupOrderServiceTest {
 
-    private PasswordValidator passwordValidator; // 被 Mock 的依賴
+    private PasswordValidator passwordValidator;
+    private com.enjoyit.repository.GroupOrderRepository groupOrderRepository;
     private GroupOrderService groupOrderService;
 
     @BeforeEach
     void setUp() {
-        // 統一風格：手動初始化 Service 並注入 Mock 好的 Validator
         passwordValidator = Mockito.mock(PasswordValidator.class);
-        groupOrderService = new GroupOrderService(passwordValidator);
+        groupOrderRepository = new com.enjoyit.repository.InMemoryGroupOrderRepository();
+        groupOrderService = new GroupOrderService(passwordValidator, groupOrderRepository);
     }
 
     @Test
     @DisplayName("UC-04: 發布團購 - 成功將狀態設定為進行中")
     void publishGroupOrder_Success() {
         // Act
-        GroupOrder result = groupOrderService.publishGroupOrder("下午茶", "11點截單");
+        GroupOrder result = groupOrderService.publishGroupOrder("下午茶", "11點截單", "v1", "pwd", "g1");
 
         // Assert
         assertNotNull(result);
         assertEquals("進行中", result.getStatus());
+        assertEquals("v1", result.getVendorId());
     }
 
     @Test
     @DisplayName("UC-04: 發布團購 - 包含公告資訊")
     void publishGroupOrder_WithAnnouncement() {
         // Act
-        GroupOrder result = groupOrderService.publishGroupOrder("下午茶", "滿500外送");
+        GroupOrder result = groupOrderService.publishGroupOrder("下午茶", "滿500外送", "v1", "pwd", "g1");
 
         // Assert
         assertNotNull(result);
@@ -48,7 +50,7 @@ class GroupOrderServiceTest {
     @DisplayName("UC-04: 管理訂單時限 - 當截止時間早於現在時應自動結單")
     void setOrderDeadline_ShouldCloseOrder_WhenTimeIsPast() {
         // Arrange
-        GroupOrder order = new GroupOrder("測試");
+        GroupOrder order = groupOrderService.publishGroupOrder("測試", null, "v1", "pwd", "g1");
         LocalDateTime pastTime = LocalDateTime.now().minusDays(1);
 
         // Act
@@ -59,32 +61,25 @@ class GroupOrderServiceTest {
     }
 
     @Test
-    @DisplayName("UC-04: 設定團購權限 - 驗證管理者密碼成功")
-    void verifyAdminAccess_Success() {
+    @DisplayName("檢查特定店家是否有進行中的團購")
+    void hasOngoingOrdersByVendor_ShouldReturnTrue_WhenActiveOrderExists() {
         // Arrange
-        String input = "1234";
-        String saved = "1234";
-        when(passwordValidator.isValid(input, saved)).thenReturn(true);
+        groupOrderService.publishGroupOrder("測試", null, "vendor1", "pwd", "g1");
 
-        // Act
-        boolean result = groupOrderService.verifyAdminAccess(input, saved);
-
-        // Assert
-        assertTrue(result);
+        // Act & Assert
+        assertTrue(groupOrderService.hasOngoingOrdersByVendor("vendor1"));
+        assertFalse(groupOrderService.hasOngoingOrdersByVendor("vendor2"));
     }
 
     @Test
-    @DisplayName("UC-04: 設定團購權限 - 驗證管理者密碼失敗")
-    void verifyAdminAccess_Failure() {
+    @DisplayName("檢查特定店家是否有進行中的團購 - 已結單則不計入")
+    void hasOngoingOrdersByVendor_ShouldReturnFalse_WhenOnlyClosedOrdersExist() {
         // Arrange
-        String input = "wrong";
-        String saved = "1234";
-        when(passwordValidator.isValid(input, saved)).thenReturn(false);
+        GroupOrder order = groupOrderService.publishGroupOrder("測試", null, "vendor1", "pwd", "g1");
+        order.setStatus("已結單");
+        groupOrderRepository.save(order);
 
-        // Act
-        boolean result = groupOrderService.verifyAdminAccess(input, saved);
-
-        // Assert
-        assertFalse(result);
+        // Act & Assert
+        assertFalse(groupOrderService.hasOngoingOrdersByVendor("vendor1"));
     }
 }

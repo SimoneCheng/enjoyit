@@ -18,4 +18,14 @@ public class GlobalExceptionHandler {
                 .collect(Collectors.joining(", "));
         return ResponseEntity.badRequest().body(Map.of("error", errorMessage));
     }
+
+    @ExceptionHandler(IllegalStateException.class)
+    public ResponseEntity<String> handleIllegalStateException(IllegalStateException ex) {
+        return ResponseEntity.badRequest().body(ex.getMessage());
+    }
+
+    @ExceptionHandler(IllegalArgumentException.class)
+    public ResponseEntity<String> handleIllegalArgumentException(IllegalArgumentException ex) {
+        return ResponseEntity.badRequest().body(ex.getMessage());
+    }
 }

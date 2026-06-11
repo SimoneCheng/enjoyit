@@ -22,8 +22,9 @@ class GroupOrderControllerTest {
 
     @BeforeEach
     void setUp() {
-        mockMvc = MockMvcBuilders.standaloneSetup(new GroupOrderController())
-                // 👇 直接抽換底層的訊息轉換器
+        com.enjoyit.repository.GroupOrderRepository repository = new com.enjoyit.repository.InMemoryGroupOrderRepository();
+        com.enjoyit.service.GroupOrderService service = new com.enjoyit.service.GroupOrderService(new com.enjoyit.service.PasswordValidator(), repository);
+        mockMvc = MockMvcBuilders.standaloneSetup(new GroupOrderController(service, repository))
                 .setMessageConverters(
                         new StringHttpMessageConverter(StandardCharsets.UTF_8),
                         new MappingJackson2HttpMessageConverter()
