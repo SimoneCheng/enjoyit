@@ -11,22 +11,26 @@ import java.util.concurrent.ConcurrentHashMap;
 
 @Repository
 public class InMemoryGroupOrderRepository implements GroupOrderRepository {
-    // 將原本存在 Controller 的 ordersMap 移到這裡統一管理
-    private final Map<String, GroupOrder> ordersMap = new ConcurrentHashMap<>();
+    private final Map<String, GroupOrder> orders = new ConcurrentHashMap<>();
 
     @Override
     public GroupOrder save(GroupOrder order) {
-        ordersMap.put(order.getOrderId(), order);
+        orders.put(order.getOrderId(), order);
         return order;
     }
 
     @Override
-    public Optional<GroupOrder> findById(String id) {
-        return Optional.ofNullable(ordersMap.get(id));
+    public Optional<GroupOrder> findById(String orderId) {
+        return Optional.ofNullable(orders.get(orderId));
     }
 
     @Override
     public List<GroupOrder> findAll() {
-        return new ArrayList<>(ordersMap.values());
+        return new ArrayList<>(orders.values());
+    }
+
+    @Override
+    public void delete(String orderId) {
+        orders.remove(orderId);
     }
 }

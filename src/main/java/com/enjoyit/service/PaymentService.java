@@ -32,6 +32,8 @@ public class PaymentService {
             throw new IllegalArgumentException("密碼錯誤，拒絕修改財務狀態！");
         }
 
+        // 先同步產出最新帳單，避免尚未查過 summary 時找不到付款紀錄
+        order.getFinanceSummary();
         order.updatePaymentStatus(payerName, status, remarks);
         groupOrderRepository.save(order);
     }

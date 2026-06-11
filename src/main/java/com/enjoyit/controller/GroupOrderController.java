@@ -1,100 +1,75 @@
 package com.enjoyit.controller;
 
 import com.enjoyit.domain.GroupOrder;
-import com.enjoyit.dto.OrderItemsBatchRequest;
+import com.enjoyit.domain.OrderItem;
 import com.enjoyit.dto.DeadlineRequest;
+import com.enjoyit.service.GroupOrderService;
 import com.enjoyit.service.OrderSummaryGenerator;
-import com.enjoyit.service.PasswordValidator;
-import com.enjoyit.repository.GroupOrderRepository;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.server.ResponseStatusException;
+
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
 import java.util.List;
 import java.util.Map;
-import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping("/api/group-orders")
 public class GroupOrderController {
 
-    // 模擬 Heap 記憶體存儲
-    private GroupOrder currentGroupOrder;
-    private final PasswordValidator passwordValidator = new PasswordValidator();
-    //private Map<String, GroupOrder> ordersMap = new java.util.concurrent.ConcurrentHashMap<>();
+    private final GroupOrderService groupOrderService;
 
-    // 1. 移除原本的 private Map<String, GroupOrder> ordersMap ...
-    // 2. 改為注入 Repository
-        private final GroupOrderRepository groupOrderRepository;
+    public GroupOrderController(GroupOrderService groupOrderService) {
+        this.groupOrderService = groupOrderService;
+    }
 
-        public GroupOrderController(GroupOrderRepository groupOrderRepository) {
-            this.groupOrderRepository = groupOrderRepository;
-        }
-
-    /**
-     * CO-07: publishGroupOrder(orderInfo, announcement)
-     * 建立新的團購活動並發布公告
-     */
-    // 1. 更新發布團購 API
     @PostMapping("/publish")
     public ResponseEntity<?> publishGroupOrder(@RequestBody Map<String, String> request) {
         String orderInfo = request.get("orderInfo");
         String announcement = request.get("announcement");
-        String vendorId = request.get("vendorId"); // 接收前端選擇的店家
-        String adminPassword = request.get("adminPassword"); // 接收前端設定的密碼
+        String vendorId = request.get("vendorId");
+        String adminPassword = request.get("adminPassword");
         String groupId = request.get("groupId");
 
         if (groupId == null || groupId.trim().isEmpty()) {
             return ResponseEntity.badRequest().body("缺少群組資訊");
         }
 
-        GroupOrder newOrder = new GroupOrder(orderInfo);
-        String orderId = "order_" + System.currentTimeMillis();
-        newOrder.setOrderId(orderId);
-        newOrder.setVendorId(vendorId);
-        newOrder.setAdminPassword(adminPassword); // 正式綁定主揪設定的密碼
-        newOrder.setGroupId(groupId.trim());
-
-        if (announcement != null && !announcement.isEmpty()) {
-            newOrder.setAnnouncement(announcement);
-        }
-
-        //ordersMap.put(orderId, newOrder);
-
-        this.currentGroupOrder = newOrder;
-        groupOrderRepository.save(newOrder);
+        String orderId = groupOrderService.publishGroupOrder(
+                orderInfo,
+                announcement,
+                vendorId,
+                adminPassword,
+                groupId
+        );
         return ResponseEntity.ok(orderId);
     }
 
-    // 2. 新增：查詢單一訂單資訊 (為了讓前端抓取綁定的 vendorId 與截止時間)
     @GetMapping("/{orderId}")
     public ResponseEntity<?> getOrderDetails(@PathVariable String orderId, @RequestParam String groupId) {
-        GroupOrder order = requireOrder(orderId, groupId);
-        groupOrderRepository.save(order);
-        return ResponseEntity.ok(order);
+        return ResponseEntity.ok(requireOrder(orderId, groupId));
     }
 
-    // 3. 新增：參與者送出點餐的 API
     @PostMapping("/{orderId}/items")
     public ResponseEntity<?> addOrderItem(
             @PathVariable String orderId,
             @RequestParam String groupId,
-            @RequestBody com.enjoyit.domain.OrderItem item) {
+            @RequestBody OrderItem item) {
         GroupOrder order = requireOrder(orderId, groupId);
         String closedMessage = getClosedOrderMessage(order);
         if (closedMessage != null) {
             return ResponseEntity.badRequest().body(closedMessage);
         }
+
         String validationMessage = validateOrderItem(item);
         if (validationMessage != null) {
             return ResponseEntity.badRequest().body(validationMessage);
         }
 
-        order.getOrderItems().add(item);
-        groupOrderRepository.save(order);
+        groupOrderService.addOrderItem(order, item);
         return ResponseEntity.ok(item);
     }
 
@@ -102,32 +77,26 @@ public class GroupOrderController {
     public ResponseEntity<?> addOrderItemsBatch(
             @PathVariable String orderId,
             @RequestParam String groupId,
-            // 🌟 關鍵修正：棄用 OrderItemsBatchRequest，直接使用 Map 接收，100% 解決反序列化報錯
-            @RequestBody Map<String, List<com.enjoyit.domain.OrderItem>> requestBody) {
-
+            @RequestBody Map<String, List<OrderItem>> requestBody) {
         GroupOrder order = requireOrder(orderId, groupId);
         String closedMessage = getClosedOrderMessage(order);
         if (closedMessage != null) {
             return ResponseEntity.badRequest().body(closedMessage);
         }
 
-        // 從 Map 中取出 items 陣列
-        List<com.enjoyit.domain.OrderItem> items = requestBody.get("items");
-
+        List<OrderItem> items = requestBody.get("items");
         if (items == null || items.isEmpty()) {
             return ResponseEntity.badRequest().body("待送出的餐點不能為空");
         }
 
-        // 驗證每一筆資料
-        for (com.enjoyit.domain.OrderItem item : items) {
+        for (OrderItem item : items) {
             String validationMessage = validateOrderItem(item);
             if (validationMessage != null) {
                 return ResponseEntity.badRequest().body(validationMessage);
             }
         }
 
-        order.getOrderItems().addAll(items);
-        groupOrderRepository.save(order);
+        groupOrderService.addOrderItems(order, items);
         return ResponseEntity.ok(items);
     }
 
@@ -136,31 +105,20 @@ public class GroupOrderController {
             @PathVariable String orderId,
             @PathVariable String itemId,
             @RequestParam String groupId,
-            @RequestBody com.enjoyit.domain.OrderItem updatedItem) {
+            @RequestBody OrderItem updatedItem) {
         GroupOrder order = requireOrder(orderId, groupId);
         String closedMessage = getClosedOrderMessage(order);
         if (closedMessage != null) {
             return ResponseEntity.badRequest().body(closedMessage);
         }
+
         String validationMessage = validateOrderItem(updatedItem);
         if (validationMessage != null) {
             return ResponseEntity.badRequest().body(validationMessage);
         }
 
-        com.enjoyit.domain.OrderItem existingItem = findOrderItem(order.getOrderItems(), itemId);
-        updatedItem.setParticipantId(updatedItem.getParticipantId().trim());
-        updatedItem.setOrderFor(updatedItem.getOrderFor().trim());
-        updatedItem.setItemName(updatedItem.getItemName().trim());
-
-        existingItem.setParticipantId(updatedItem.getParticipantId());
-        existingItem.setOrderFor(updatedItem.getOrderFor());
-        existingItem.setMenuItemId(updatedItem.getMenuItemId());
-        existingItem.setItemName(updatedItem.getItemName());
-        existingItem.setUnitPrice(updatedItem.getUnitPrice());
-        existingItem.setCustomizations(updatedItem.getCustomizations());
-        existingItem.setQuantity(updatedItem.getQuantity());
-        existingItem.setOrderTotalPrice(updatedItem.getOrderTotalPrice());
-        groupOrderRepository.save(order);
+        OrderItem existingItem = findOrderItem(order.getOrderItems(), itemId);
+        groupOrderService.updateOrderItem(order, existingItem, updatedItem);
         return ResponseEntity.ok(existingItem);
     }
 
@@ -175,74 +133,54 @@ public class GroupOrderController {
             return ResponseEntity.badRequest().body(closedMessage);
         }
 
-        com.enjoyit.domain.OrderItem existingItem = findOrderItem(order.getOrderItems(), itemId);
-        order.getOrderItems().remove(existingItem);
-        groupOrderRepository.save(order);
+        OrderItem existingItem = findOrderItem(order.getOrderItems(), itemId);
+        groupOrderService.deleteOrderItem(order, existingItem);
         return ResponseEntity.ok("餐點已取消");
     }
 
-    // 供左側列表讀取所有團購
     @GetMapping("/all")
     public ResponseEntity<?> getAllOrders(@RequestParam String groupId) {
         if (groupId == null || groupId.trim().isEmpty()) {
             return ResponseEntity.badRequest().body("缺少群組資訊");
         }
-
-        return ResponseEntity.ok(groupOrderRepository.findAll().stream()
-                .filter(order -> groupId.equals(order.getGroupId()))
-                .collect(Collectors.toList()));
+        return ResponseEntity.ok(groupOrderService.getOrdersByGroupId(groupId));
     }
 
-    /**
-     * CO-08: setOrderDeadline(newTime)
-     * 設定團購截止時間，並由領域物件判斷是否截止
-     */
-    // 4. 更新：設定截止時間 (必須針對特定 orderId，不然多個團購會打架)
-    // 升級版：設定截止時間 (需透過 URL 參數夾帶密碼驗證)
     @PutMapping("/{orderId}/deadline")
     public ResponseEntity<?> setOrderDeadline(
             @PathVariable String orderId,
             @RequestParam String groupId,
-            @RequestParam(required = false) String password, // 新增密碼參數
+            @RequestParam(required = false) String password,
             @RequestBody DeadlineRequest request) {
         GroupOrder order = requireOrder(orderId, groupId);
-
-        // 後端親自驗證密碼
-        if (!passwordValidator.isValid(password, order.getAdminPassword())) {
+        if (!groupOrderService.verifyAdminAccess(password, order.getAdminPassword())) {
             return ResponseEntity.status(401).body("密碼錯誤，權限不足");
         }
 
         String deadlineStr = request.getDeadline();
         if (deadlineStr == null || deadlineStr.trim().isEmpty()) {
-            groupOrderRepository.save(order);
             return ResponseEntity.ok("未設定截止時間");
         }
+
         try {
             LocalDateTime newTime = LocalDateTime.parse(deadlineStr, DateTimeFormatter.ISO_LOCAL_DATE_TIME);
-            order.setOrderDeadline(newTime);
-            groupOrderRepository.save(order);
+            groupOrderService.setOrderDeadline(order, newTime);
             return ResponseEntity.ok("已更新截止時間");
         } catch (DateTimeParseException e) {
             return ResponseEntity.badRequest().body("時間格式不正確");
         }
     }
 
-    /**
-     * CO-09: inputAdminPassword (升級版：針對特定 orderId 驗證)
-     */
     @PostMapping("/{orderId}/validate-admin")
     public ResponseEntity<?> inputAdminPassword(
             @PathVariable String orderId,
             @RequestParam String groupId,
             @RequestBody Map<String, String> request) {
         GroupOrder order = requireOrder(orderId, groupId);
-
         String adminPassword = request.get("password");
-        // 比對該特定訂單的密碼
-        boolean isValid = passwordValidator.isValid(adminPassword, order.getAdminPassword());
+        boolean isValid = groupOrderService.verifyAdminAccess(adminPassword, order.getAdminPassword());
 
         if (isValid) {
-            groupOrderRepository.save(order);
             return ResponseEntity.ok("AuthToken_Issued");
         }
         return ResponseEntity.status(401).body("Invalid Password");
@@ -255,24 +193,21 @@ public class GroupOrderController {
             @RequestBody(required = false) Map<String, String> request) {
         GroupOrder order = requireOrder(orderId, groupId);
         String password = request == null ? null : request.get("password");
-        if (!passwordValidator.isValid(password, order.getAdminPassword())) {
+        if (!groupOrderService.verifyAdminAccess(password, order.getAdminPassword())) {
             return ResponseEntity.status(401).body("密碼錯誤，權限不足");
         }
-        order.setStatus("已結單");
-        groupOrderRepository.save(order);
+
+        groupOrderService.closeOrder(order);
         return ResponseEntity.ok("訂單已成功結單");
     }
 
-    /**
-     * CO-10: downloadOrderSummary (升級版：針對特定 orderId 產出總表)
-     */
     @GetMapping("/{orderId}/summary")
     public ResponseEntity<?> downloadOrderSummary(
             @PathVariable String orderId,
             @RequestParam String groupId,
             @RequestParam(required = false) String password) {
         GroupOrder order = requireOrder(orderId, groupId);
-        if (!passwordValidator.isValid(password, order.getAdminPassword())) {
+        if (!groupOrderService.verifyAdminAccess(password, order.getAdminPassword())) {
             return ResponseEntity.status(401).body("密碼錯誤，權限不足");
         }
 
@@ -281,7 +216,6 @@ public class GroupOrderController {
         }
 
         OrderSummaryGenerator generator = new OrderSummaryGenerator();
-        groupOrderRepository.save(order);
         return ResponseEntity.ok(generator.createDetailedSummary(order.getOrderItems()));
     }
 
@@ -289,11 +223,10 @@ public class GroupOrderController {
         if (groupId == null || groupId.trim().isEmpty()) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "缺少群組資訊");
         }
-        GroupOrder order = groupOrderRepository.findById(orderId).orElse(null);
-        if (order == null || !groupId.equals(order.getGroupId())) {
-            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "找不到該訂單");
-        }
-        return order;
+
+        return groupOrderService.getOrderById(orderId)
+                .filter(order -> groupId.equals(order.getGroupId()))
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "找不到該訂單"));
     }
 
     private String getClosedOrderMessage(GroupOrder order) {
@@ -303,7 +236,7 @@ public class GroupOrderController {
         return null;
     }
 
-    private String validateOrderItem(com.enjoyit.domain.OrderItem item) {
+    private String validateOrderItem(OrderItem item) {
         if (item == null) {
             return "缺少餐點資料";
         }
@@ -328,7 +261,7 @@ public class GroupOrderController {
         return null;
     }
 
-    private com.enjoyit.domain.OrderItem findOrderItem(List<com.enjoyit.domain.OrderItem> orderItems, String itemId) {
+    private OrderItem findOrderItem(List<OrderItem> orderItems, String itemId) {
         return orderItems.stream()
                 .filter(item -> itemId.equals(item.getItemID()))
                 .findFirst()

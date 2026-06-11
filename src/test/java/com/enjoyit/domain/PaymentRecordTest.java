@@ -11,7 +11,7 @@ class PaymentRecordTest {
         PaymentRecord record = new PaymentRecord("device_123", 150);
 
         // Assert
-        assertEquals("device_123", record.getParticipantId());
+        assertEquals("device_123", record.getPayerName());
         assertEquals(150, record.getAmountDue());
         assertEquals("未付款", record.getStatus());
         assertEquals("", record.getRemarks());
