@@ -1,38 +1,43 @@
 package com.enjoyit.controller;
-import java.nio.charset.StandardCharsets;
+
+import com.enjoyit.repository.InMemoryGroupOrderRepository;
+import com.enjoyit.service.GroupOrderService;
+import com.enjoyit.service.PasswordValidator;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.MediaType;
-import org.springframework.test.web.servlet.MockMvc;
-import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.http.converter.StringHttpMessageConverter;
 import org.springframework.http.converter.json.MappingJackson2HttpMessageConverter;
+import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.setup.MockMvcBuilders;
+
+import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
 import java.util.Map;
 
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
-
-import com.enjoyit.repository.InMemoryGroupOrderRepository;
-import com.enjoyit.service.GroupOrderService;
-import com.enjoyit.service.PasswordValidator;
+import static org.hamcrest.Matchers.startsWith;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 class GroupOrderControllerTest {
 
     private MockMvc mockMvc;
-    private ObjectMapper objectMapper = new ObjectMapper();
-    private GroupOrderService groupOrderService;
+    private final ObjectMapper objectMapper = new ObjectMapper();
 
     @BeforeEach
     void setUp() {
         PasswordValidator passwordValidator = new PasswordValidator();
         InMemoryGroupOrderRepository repository = new InMemoryGroupOrderRepository();
-        groupOrderService = new GroupOrderService(passwordValidator, repository);
+        GroupOrderService groupOrderService = new GroupOrderService(passwordValidator, repository);
 
         mockMvc = MockMvcBuilders.standaloneSetup(new GroupOrderController(groupOrderService))
-                // 👇 直接抽換底層的訊息轉換器
                 .setMessageConverters(
                         new StringHttpMessageConverter(StandardCharsets.UTF_8),
                         new MappingJackson2HttpMessageConverter()
@@ -47,21 +52,20 @@ class GroupOrderControllerTest {
         request.put("orderInfo", "實驗室下午茶");
         request.put("vendorId", "vendor_001");
         request.put("adminPassword", "secret123");
-        request.put("groupId", "lab_group"); // 帶入正常的群組 ID
+        request.put("groupId", "lab_group");
 
         mockMvc.perform(post("/api/group-orders/publish")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isOk())
-                .andExpect(content().string(org.hamcrest.Matchers.startsWith("order_")));
+                .andExpect(content().string(startsWith("order_")));
     }
 
     @Test
-    @DisplayName("測試 API 防護網：發起團購時若缺少 groupId，應回傳 400 Bad Request")
+    @DisplayName("測試 API 防護網：發起團購時若缺少 groupId，應回傳 400")
     void testPublishGroupOrder_MissingGroupId() throws Exception {
         Map<String, String> request = new HashMap<>();
         request.put("orderInfo", "非法團購");
-        // 🚨 刻意不放入 groupId 參數
 
         mockMvc.perform(post("/api/group-orders/publish")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -73,7 +77,6 @@ class GroupOrderControllerTest {
     @Test
     @DisplayName("測試查詢所有團購：缺少 groupId 參數時，應拒絕存取")
     void testGetAllOrders_MissingGroupId() throws Exception {
-        // 模擬直接呼叫 /api/group-orders/all 而不帶參數
         mockMvc.perform(get("/api/group-orders/all"))
                 .andExpect(status().isBadRequest());
     }
@@ -81,35 +84,29 @@ class GroupOrderControllerTest {
     @Test
     @DisplayName("測試點餐防護網：已結單的團購應拒絕新增餐點")
     void testAddOrderItem_RejectedWhenClosed() throws Exception {
-        // 步驟 1：先發起一個團購
         Map<String, String> publishReq = new HashMap<>();
         publishReq.put("orderInfo", "測試防護網團購");
         publishReq.put("groupId", "secure_group");
         publishReq.put("adminPassword", "1234");
         publishReq.put("vendorId", "vendor_001");
 
-        // 執行發起 API，並把回傳的 orderId 抓出來存進變數
         String orderId = mockMvc.perform(post("/api/group-orders/publish")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(publishReq)))
                 .andExpect(status().isOk())
                 .andReturn().getResponse().getContentAsString();
 
-        // 步驟 2：模擬管理員將這個團購結單
         mockMvc.perform(post("/api/group-orders/close/" + orderId + "?groupId=secure_group")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"password\":\"1234\"}"))
                 .andExpect(status().isOk());
 
-        // 步驟 3：模擬遲到的同學嘗試送出點餐
         String orderItemJson = "{\"participantId\":\"user_1\",\"itemName\":\"綠茶\",\"unitPrice\":30,\"quantity\":1}";
 
         mockMvc.perform(post("/api/group-orders/" + orderId + "/items?groupId=secure_group")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(orderItemJson))
-                // 驗證系統是否有成功擋下，回傳 400 Bad Request
                 .andExpect(status().isBadRequest())
-                // 驗證錯誤訊息是否正確
                 .andExpect(content().string("此團購已截止，無法點餐"));
     }
 

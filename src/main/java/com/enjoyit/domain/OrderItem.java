@@ -21,7 +21,6 @@ public class OrderItem {
 
     private int quantity;         // 數量
     private int orderTotalPrice;  // 該品項的小計 ( (基礎單價 + 客製化加價) * 數量 )
-
     // Constructor
     public OrderItem(String participantId, String orderFor, String menuItemId, String itemName, int unitPrice, List<String> customizations, int quantity, int orderTotalPrice) {
         this.itemID = UUID.randomUUID().toString();

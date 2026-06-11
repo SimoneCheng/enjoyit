@@ -2,7 +2,9 @@ package com.enjoyit.repository;
 
 import com.enjoyit.domain.GroupOrder;
 import org.springframework.stereotype.Repository;
-import java.util.Collection;
+
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
@@ -12,8 +14,9 @@ public class InMemoryGroupOrderRepository implements GroupOrderRepository {
     private final Map<String, GroupOrder> orders = new ConcurrentHashMap<>();
 
     @Override
-    public void save(GroupOrder order) {
+    public GroupOrder save(GroupOrder order) {
         orders.put(order.getOrderId(), order);
+        return order;
     }
 
     @Override
@@ -22,8 +25,8 @@ public class InMemoryGroupOrderRepository implements GroupOrderRepository {
     }
 
     @Override
-    public Collection<GroupOrder> findAll() {
-        return orders.values();
+    public List<GroupOrder> findAll() {
+        return new ArrayList<>(orders.values());
     }
 
     @Override
