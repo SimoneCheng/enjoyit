@@ -6,7 +6,7 @@ window.dashboardModules.push(() => {
 async function handlePublish() {
     const orderInfo = document.getElementById('orderName')?.value.trim();
     const announcement = document.getElementById('announcement')?.value.trim();
-    const vendorId = document.getElementById('vendorSelect')?.value;
+    const vendorId = document.getElementById('publishVendorSelect')?.value;
     const adminPassword = document.getElementById('adminPwdSetup')?.value;
     const deadline = document.getElementById('deadline')?.value;
 
@@ -53,7 +53,7 @@ if (typeof module !== 'undefined' && module.exports) {
     module.exports = { handlePublish };
 }
 async function fetchVendorsForPublish() {
-    const select = document.getElementById('vendorSelect');
+    const select = document.getElementById('publishVendorSelect');
     if (!select) return;
 
     try {

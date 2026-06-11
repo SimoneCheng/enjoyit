@@ -1,7 +1,7 @@
 window.dashboardModules = window.dashboardModules || [];
 
 async function fetchVendorsForMenu() {
-    const select = document.getElementById('vendorSelect');
+    const select = document.getElementById('menuVendorSelect');
     if (!select) return;
 
     const urlParams = new URLSearchParams(window.location.search);
@@ -32,7 +32,7 @@ async function fetchVendorsForMenu() {
 }
 
 function initMenuEditor() {
-    const select = document.getElementById('vendorSelect');
+    const select = document.getElementById('menuVendorSelect');
     if (!select) return;
 
     select.addEventListener('change', (e) => {
