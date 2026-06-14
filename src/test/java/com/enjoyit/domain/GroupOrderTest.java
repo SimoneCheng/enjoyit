@@ -1,58 +1,70 @@
 package com.enjoyit.domain;
 
-import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import java.time.LocalDateTime;
-
+import java.util.List;
+import java.util.Map;
 import static org.junit.jupiter.api.Assertions.*;
 
 class GroupOrderTest {
 
-    @Test
-    @DisplayName("測試建立 GroupOrder 時，初始狀態應為進行中")
-    void testInitialStatus() {
-        GroupOrder order = new GroupOrder("測試團購名稱");
+    private GroupOrder order;
 
-        assertEquals("進行中", order.getStatus());
-        assertEquals("測試團購名稱", order.getOrderInfo());
+    @BeforeEach
+    void setUp() {
+        order = new GroupOrder("測試團購");
     }
 
     @Test
-    @DisplayName("測試設定未來的截止時間，狀態應維持進行中")
-    void testSetFutureDeadline() {
-        GroupOrder order = new GroupOrder("測試團購");
-        LocalDateTime futureTime = LocalDateTime.now().plusDays(1); // 明天
+    void testGetFinanceSummary_ShouldCalculateTotalCorrectly() {
+        OrderItem item1 = new OrderItem("p1", "王小明", "m1", "珍奶", 50, List.of("半糖"), 1, 50);
+        OrderItem item2 = new OrderItem("p1", "王小明", "m2", "綠茶", 30, List.of(), 2, 60);
+        OrderItem item3 = new OrderItem("p2", "陳小美", "m1", "珍奶", 50, List.of(), 1, 50);
 
-        order.setOrderDeadline(futureTime);
+        order.getOrderItems().addAll(List.of(item1, item2, item3));
 
-        assertEquals(futureTime, order.getDeadline());
-        assertEquals("進行中", order.getStatus());
+        List<Map<String, Object>> summary = order.getFinanceSummary();
+
+        assertEquals(2, summary.size(), "應該只有兩個訂購人的帳單");
+        Map<String, Object> p1Summary = summary.stream()
+                .filter(s -> s.get("payerName").equals("王小明"))
+                .findFirst()
+                .orElseThrow();
+        assertEquals(110, p1Summary.get("amountDue"));
+        assertEquals("未付款", p1Summary.get("status"));
+
+        Map<String, Object> p2Summary = summary.stream()
+                .filter(s -> s.get("payerName").equals("陳小美"))
+                .findFirst()
+                .orElseThrow();
+        assertEquals(50, p2Summary.get("amountDue"));
     }
 
     @Test
-    @DisplayName("測試設定過去的截止時間，狀態應自動變更為已結單")
-    void testSetPastDeadline() {
-        GroupOrder order = new GroupOrder("測試團購");
-        LocalDateTime pastTime = LocalDateTime.now().minusHours(1); // 一小時前
+    void testGetFinanceSummary_ShouldPreserveStatusAndRemarksWhenRecalculating() {
+        // Arrange
+        OrderItem item1 = new OrderItem("p1", "王小明", "m1", "珍奶", 50, List.of(), 1, 50);
+        order.getOrderItems().add(item1);
 
-        order.setOrderDeadline(pastTime);
+        order.getFinanceSummary();
+        order.updatePaymentStatus("王小明", "已付款", "找50元");
 
-        assertEquals(pastTime, order.getDeadline());
-        assertEquals("已結單", order.getStatus());
+        OrderItem item2 = new OrderItem("p1", "王小明", "m2", "綠茶", 30, List.of(), 1, 30);
+        order.getOrderItems().add(item2);
+        List<Map<String, Object>> summary = order.getFinanceSummary();
+
+        Map<String, Object> p1Summary = summary.get(0);
+        assertEquals(80, p1Summary.get("amountDue"), "金額應更新為 80");
+        assertEquals("已付款", p1Summary.get("status"), "原付款狀態應保留");
+        assertEquals("找50元", p1Summary.get("remarks"), "原備註應保留");
     }
 
     @Test
-    @DisplayName("測試更新截止時間為未來，已結單狀態應變更回進行中")
-    void testUpdateDeadlineFromPastToFuture_ShouldReopen() {
-        GroupOrder order = new GroupOrder("測試團購");
-        LocalDateTime pastTime = LocalDateTime.now().minusHours(1); // 一小時前
-        order.setOrderDeadline(pastTime);
-        assertEquals("已結單", order.getStatus()); // 確認已結單
-
-        LocalDateTime futureTime = LocalDateTime.now().plusDays(1); // 明天
-        order.setOrderDeadline(futureTime);
-        
-        assertEquals(futureTime, order.getDeadline());
-        assertEquals("進行中", order.getStatus()); // 確認變回進行中
+    void testUpdatePaymentStatus_ShouldThrowExceptionIfParticipantNotFound() {
+        // Act & Assert
+        Exception exception = assertThrows(IllegalArgumentException.class, () -> {
+            order.updatePaymentStatus("non_exist_id", "已付款", "");
+        });
+        assertEquals("找不到該訂購人的帳單項目", exception.getMessage());
     }
 }

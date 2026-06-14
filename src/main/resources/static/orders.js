@@ -1,5 +1,7 @@
 let currentOrderId = null;
 let currentVendorId = null;
+let currentOrderDeadline = null;
+let deadlineTimer = null;
 let editingTarget = null;
 
 const DEVICE_KEY = 'enjoyit-device-id';
@@ -9,6 +11,8 @@ const DRAFT_CACHE_PREFIX = 'enjoyit-draft-order-items';
 window.dashboardModules = window.dashboardModules || [];
 window.dashboardModules.push(() => {
     refreshList();
+    if (deadlineTimer) clearInterval(deadlineTimer);
+    deadlineTimer = setInterval(checkDeadlineRealTime, 1000);
 });
 
 window.handleOrdersSectionShown = async function handleOrdersSectionShown() {
@@ -25,6 +29,32 @@ window.onMenuUpdated = async function onMenuUpdated(vendorId) {
         await goToItemView(currentOrderId);
     }
 };
+
+function checkDeadlineRealTime() {
+    if (!currentOrderDeadline || !currentOrderId) return;
+
+    const now = new Date();
+    const deadline = new Date(currentOrderDeadline);
+    if (now <= deadline) return;
+
+    const deadlineDisplay = document.getElementById('deadlineDisplay');
+    const closeBtn = document.getElementById('closeOrderBtn');
+
+    if (deadlineDisplay && !deadlineDisplay.textContent.includes('已截止')) {
+        deadlineDisplay.textContent = '截止時間：已截止';
+        deadlineDisplay.style.color = 'red';
+    }
+
+    if (closeBtn && !closeBtn.disabled) {
+        closeBtn.textContent = '團購已截止';
+        closeBtn.disabled = true;
+        closeBtn.classList.add('disabled');
+    }
+
+    if (currentVendorId) {
+        loadOrderMenu(currentVendorId, true);
+    }
+}
 
 function getDeviceId() {
     if (typeof localStorage === 'undefined') {
@@ -222,6 +252,7 @@ async function goToItemView(orderId) {
         if (!res.ok) return;
         const order = await res.json();
         currentVendorId = order.vendorId;
+        currentOrderDeadline = order.deadline;
 
         viewingTitle.textContent = '團購： ' + order.orderInfo;
         document.getElementById('orderAnnouncementDisplay').textContent = '📢 公告：' + (order.announcement || '無公告');
@@ -242,6 +273,12 @@ async function goToItemView(orderId) {
         renderParticipantOrders(order);
     } catch (e) {
         console.error(e);
+    }
+
+    // 如果對帳表開著，順便刷新它
+    const financeSection = document.getElementById('hostFinanceSection');
+    if (financeSection && financeSection.style.display === 'block') {
+        loadPublicFinanceTable();
     }
 }
 
@@ -630,35 +667,45 @@ async function submitOrderItem(itemId, itemName, basePrice) {
 }
 
 async function submitDraftOrders() {
-    const drafts = loadDraftOrderRecords(currentOrderId);
-    if (drafts.length === 0) {
-        alert('待送出清單目前是空的');
-        return;
-    }
+    if (!currentGroupId) return alert('缺少群組資訊，請重新登入');
 
-    const payload = {
-        items: drafts.map(({ draftId, ...item }) => item)
-    };
+    const draftItems = loadDraftOrderRecords(currentOrderId);
+    if (draftItems.length === 0) return alert('沒有待送出的餐點');
+
+    // 淨化資料：剃除後端不認識的 draftId
+    const cleanPayload = draftItems.map(item => {
+        const { draftId, ...restOfItem } = item;
+        return restOfItem;
+    });
 
     try {
         const res = await fetch(`/api/group-orders/${currentOrderId}/items/batch?groupId=${encodeURIComponent(currentGroupId)}`, {
             method: 'POST',
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify(payload)
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ items: cleanPayload })
         });
+
         if (res.ok) {
+            // 🌟 關鍵修正：讀取後端成功存檔後回傳的實體餐點陣列（裡面包含後端隨機生成的唯一 itemID）
             const savedItems = await res.json();
-            savedItems.forEach(item => {
-                upsertLocalOrderRecord(currentOrderId, normalizeOrderItem(item));
-            });
-            clearDraftOrderRecords(currentOrderId);
-            alert(`✅ 已一次送出 ${savedItems.length} 筆餐點`);
+
+            // 🌟 關鍵修正：將這批成功的餐點逐一寫入這台裝置的本地紀錄中，讓前端欄位能正確追蹤
+            if (Array.isArray(savedItems)) {
+                savedItems.forEach(item => {
+                    upsertLocalOrderRecord(currentOrderId, item);
+                });
+            }
+
+            alert('點餐成功！');
+            clearDraftOrders();
             await goToItemView(currentOrderId);
         } else {
-            handleOrderMutationError(await res.text());
+            const errText = await res.text();
+            alert('送出失敗：\n' + errText.substring(0, 150) + (errText.length > 150 ? '...' : ''));
         }
     } catch (e) {
-        alert('批次送出失敗');
+        console.error("前端執行發生錯誤：", e);
+        alert('連線異常，請重新整理網頁確認。');
     }
 }
 
@@ -689,22 +736,31 @@ function clearDraftOrders() {
 }
 
 async function deleteOrderItem(itemId) {
-    const confirmed = typeof confirm === 'function' ? confirm('確定要取消這筆餐點嗎？') : true;
-    if (!confirmed) return;
+    // 1. 檢查群組資訊
+    if (!currentGroupId) return alert('缺少群組資訊，請重新登入');
+
+    // 🌟 關鍵修正：已經把容易卡死的 isProcessing 防呆機制徹底刪除！
+
+    // 2. 瀏覽器內建的 confirm 本身就會擋住畫面，完美防止連點
+    if (!confirm('確定要取消這份餐點嗎？')) return;
 
     try {
         const res = await fetch(`/api/group-orders/${currentOrderId}/items/${itemId}?groupId=${encodeURIComponent(currentGroupId)}`, {
             method: 'DELETE'
         });
+
         if (res.ok) {
-            removeLocalOrderRecord(currentOrderId, itemId);
             alert('取消餐點成功');
+            // 🌟 額外保險：同步將這筆被取消的餐點從前端這台裝置的記憶體中移除
+            removeLocalOrderRecord(currentOrderId, itemId);
             await goToItemView(currentOrderId);
         } else {
-            handleOrderMutationError(await res.text());
+            const errText = await res.text();
+            alert('取消失敗：\n' + errText.substring(0, 150) + (errText.length > 150 ? '...' : ''));
         }
     } catch (e) {
-        alert('取消失敗');
+        console.error("前端執行發生錯誤：", e);
+        alert('連線異常，請重新整理網頁確認。');
     }
 }
 
@@ -767,6 +823,115 @@ async function adminAction(type) {
     }
 }
 
+// ==========================================
+// UC-07: 財務對帳相關功能 (最新版本)
+// ==========================================
+
+function toggleFinanceTable() {
+    const section = document.getElementById('hostFinanceSection');
+    if (section.style.display === 'none' || section.style.display === '') {
+        loadPublicFinanceTable();
+    } else {
+        section.style.display = 'none';
+    }
+}
+
+async function loadPublicFinanceTable() {
+    if (!currentOrderId) return alert('請先選擇一個團購');
+
+    try {
+        const res = await fetch(`/api/group-orders/${currentOrderId}/payments/summary`);
+        if (!res.ok) throw new Error(await res.text());
+        const summaryData = await res.json();
+
+        let totalReceived = 0;
+        let totalRemaining = 0;
+        summaryData.forEach(r => {
+            if (r.status === '已付款') totalReceived += r.amountDue;
+            else totalRemaining += r.amountDue;
+        });
+
+        let html = `
+            <div style="display: flex; gap: 20px; background: #e8f5e9; padding: 15px; border-radius: 8px; margin-bottom: 15px; border: 1px solid #c8e6c9;">
+                <div style="font-size: 1.1rem; color: #2e7d32;">💰 總實收金額：<strong>$${totalReceived}</strong></div>
+                <div style="font-size: 1.1rem; color: #d32f2f;">⚠️ 剩餘待繳金額：<strong>$${totalRemaining}</strong></div>
+            </div>
+            <table style="width: 100%; border-collapse: collapse; text-align: left; margin-top: 10px;">
+                <thead>
+                    <tr style="background: #f5f5f5; border-bottom: 2px solid #ccc;">
+                        <th style="padding: 10px;">訂購人與餐點內容</th>
+                        <th style="padding: 10px;">應付金額</th>
+                        <th style="padding: 10px;">目前狀態</th>
+                        <th style="padding: 10px;">備註 (多收/尚欠)</th>
+                        <th style="padding: 10px;">主揪操作區</th>
+                    </tr>
+                </thead>
+                <tbody>
+        `;
+
+        if (summaryData.length === 0) {
+            html += `<tr><td colspan="5" style="padding:15px; color:#666;">目前尚無任何人點餐，無法對帳。</td></tr>`;
+        }
+
+        summaryData.forEach(record => {
+            const itemsHtml = record.details.map(item => `<div style="font-size:0.9rem; color:#555;">• ${item}</div>`).join('');
+            const isPaid = record.status === '已付款';
+            const statusColor = isPaid ? '#27ae60' : '#ff9800';
+
+            html += `
+                <tr style="border-bottom: 1px solid #eee;">
+                    <td style="padding: 12px; max-width: 250px; word-wrap: break-word;">
+                        <div style="font-size:1.1rem; font-weight:bold; color:#1877f2; margin-bottom: 4px;">👤 ${record.payerName}</div>
+                        ${itemsHtml}
+                    </td>
+                    <td style="padding: 12px; font-weight:bold; color:#d32f2f; font-size:1.1rem;">$${record.amountDue}</td>
+                    <td style="padding: 12px;"><span style="color:white; background:${statusColor}; padding:4px 8px; border-radius:4px; font-weight:bold;">${record.status}</span></td>
+
+                    <td style="padding: 12px;">
+                        <input type="text" id="remark-${record.payerName}" value="${record.remarks || ''}" placeholder="例如：找10元" style="width: 100px; padding: 5px; border-radius:4px; border:1px solid #ccc;">
+                    </td>
+
+                    <td style="padding: 12px; display: flex; flex-direction: column; gap: 5px;">
+                        ${isPaid ?
+                            `<button class="action-btn" style="background:#e0e0e0; color:#333; padding:5px 10px; font-size:0.85rem;" onclick="promptPasswordAndUpdate('${record.payerName}', '未付款')">取消核帳</button>` :
+                            `<button class="action-btn" style="background:#27ae60; color:white; padding:5px 10px; font-size:0.85rem;" onclick="promptPasswordAndUpdate('${record.payerName}', '已付款')">確認收錢</button>`
+                        }
+                        <button class="action-btn" style="background:#2196f3; color:white; padding:5px 10px; font-size:0.85rem;" onclick="promptPasswordAndUpdate('${record.payerName}', '${record.status}')">💾 儲存備註</button>
+                    </td>
+                </tr>
+            `;
+        });
+
+        html += `</tbody></table>`;
+        document.getElementById('financeTableContainer').innerHTML = html;
+        document.getElementById('hostFinanceSection').style.display = 'block';
+    } catch (e) {
+        alert(e.message);
+    }
+}
+
+async function promptPasswordAndUpdate(payerName, newStatus) {
+    const password = prompt(`要修改【${payerName}】的財務狀態，請輸入主揪密碼：`);
+    if (!password) return;
+
+    const remarkInput = document.getElementById(`remark-${payerName}`);
+    const remarks = remarkInput ? remarkInput.value : '';
+
+    try {
+        const res = await fetch(`/api/group-orders/${currentOrderId}/payments/status?payerName=${encodeURIComponent(payerName)}&status=${encodeURIComponent(newStatus)}&remarks=${encodeURIComponent(remarks)}&password=${encodeURIComponent(password)}`, {
+            method: 'PUT'
+        });
+        if (res.ok) {
+            loadPublicFinanceTable();
+        } else {
+            alert(await res.text());
+        }
+    } catch (e) {
+        alert("連線異常");
+    }
+}
+
+// 輸出給 Jest 測試使用
 if (typeof module !== 'undefined' && module.exports) {
     module.exports = {
         submitOrderItem,

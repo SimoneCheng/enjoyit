@@ -1,72 +1,65 @@
 package com.enjoyit.service;
 
 import com.enjoyit.domain.GroupOrder;
+import com.enjoyit.repository.InMemoryGroupOrderRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
-import org.mockito.Mockito;
+
 import java.time.LocalDateTime;
 
 import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.Mockito.when;
 
 class GroupOrderServiceTest {
 
-    private PasswordValidator passwordValidator;
-    private com.enjoyit.repository.GroupOrderRepository groupOrderRepository;
+    private InMemoryGroupOrderRepository groupOrderRepository;
     private GroupOrderService groupOrderService;
 
     @BeforeEach
     void setUp() {
-        passwordValidator = Mockito.mock(PasswordValidator.class);
-        groupOrderRepository = new com.enjoyit.repository.InMemoryGroupOrderRepository();
+        PasswordValidator passwordValidator = new PasswordValidator();
+        groupOrderRepository = new InMemoryGroupOrderRepository();
         groupOrderService = new GroupOrderService(passwordValidator, groupOrderRepository);
     }
 
     @Test
     @DisplayName("UC-04: 發布團購 - 成功將狀態設定為進行中")
     void publishGroupOrder_Success() {
-        // Act
-        GroupOrder result = groupOrderService.publishGroupOrder("下午茶", "11點截單", "v1", "pwd", "g1");
+        String orderId = groupOrderService.publishGroupOrder("下午茶", "11點截單", "v1", "pwd", "g1");
+        GroupOrder result = groupOrderService.getOrderById(orderId).orElseThrow();
 
-        // Assert
         assertNotNull(result);
         assertEquals("進行中", result.getStatus());
         assertEquals("v1", result.getVendorId());
+        assertTrue(orderId.startsWith("order_"));
     }
 
     @Test
     @DisplayName("UC-04: 發布團購 - 包含公告資訊")
     void publishGroupOrder_WithAnnouncement() {
-        // Act
-        GroupOrder result = groupOrderService.publishGroupOrder("下午茶", "滿500外送", "v1", "pwd", "g1");
+        String orderId = groupOrderService.publishGroupOrder("下午茶", "滿500外送", "v1", "p1", "g1");
+        GroupOrder result = groupOrderService.getOrderById(orderId).orElseThrow();
 
-        // Assert
-        assertNotNull(result);
         assertEquals("滿500外送", result.getAnnouncement());
     }
 
     @Test
     @DisplayName("UC-04: 管理訂單時限 - 當截止時間早於現在時應自動結單")
     void setOrderDeadline_ShouldCloseOrder_WhenTimeIsPast() {
-        // Arrange
-        GroupOrder order = groupOrderService.publishGroupOrder("測試", null, "v1", "pwd", "g1");
+        String orderId = groupOrderService.publishGroupOrder("測試", null, "v1", "pwd", "g1");
+        GroupOrder order = groupOrderService.getOrderById(orderId).orElseThrow();
         LocalDateTime pastTime = LocalDateTime.now().minusDays(1);
 
-        // Act
         groupOrderService.setOrderDeadline(order, pastTime);
 
-        // Assert
         assertEquals("已結單", order.getStatus());
     }
 
     @Test
     @DisplayName("檢查特定店家是否有進行中的團購")
     void hasOngoingOrdersByVendor_ShouldReturnTrue_WhenActiveOrderExists() {
-        // Arrange
         groupOrderService.publishGroupOrder("測試", null, "vendor1", "pwd", "g1");
 
-        // Act & Assert
         assertTrue(groupOrderService.hasOngoingOrdersByVendor("vendor1"));
         assertFalse(groupOrderService.hasOngoingOrdersByVendor("vendor2"));
     }
@@ -74,12 +67,27 @@ class GroupOrderServiceTest {
     @Test
     @DisplayName("檢查特定店家是否有進行中的團購 - 已結單則不計入")
     void hasOngoingOrdersByVendor_ShouldReturnFalse_WhenOnlyClosedOrdersExist() {
-        // Arrange
-        GroupOrder order = groupOrderService.publishGroupOrder("測試", null, "vendor1", "pwd", "g1");
+        String orderId = groupOrderService.publishGroupOrder("測試", null, "vendor1", "pwd", "g1");
+        GroupOrder order = groupOrderService.getOrderById(orderId).orElseThrow();
         order.setStatus("已結單");
         groupOrderRepository.save(order);
 
-        // Act & Assert
         assertFalse(groupOrderService.hasOngoingOrdersByVendor("vendor1"));
+    }
+
+    @Test
+    @DisplayName("UC-04: 設定團購權限 - 驗證管理者密碼成功")
+    void verifyAdminAccess_Success() {
+        boolean result = groupOrderService.verifyAdminAccess("1234", "1234");
+
+        assertTrue(result);
+    }
+
+    @Test
+    @DisplayName("UC-04: 設定團購權限 - 驗證管理者密碼失敗")
+    void verifyAdminAccess_Failure() {
+        boolean result = groupOrderService.verifyAdminAccess("wrong", "1234");
+
+        assertFalse(result);
     }
 }

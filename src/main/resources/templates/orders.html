@@ -56,6 +56,17 @@
                 <div id="participantOrdersList"></div>
             </div>
 
+
+
+            <div class="btn-group">
+                <button class="action-btn" style="background: #9c27b0; width: 100%; margin-top: 10px;" onclick="toggleFinanceTable()">📋 展開財務對帳總表</button>
+            </div>
+
+            <div id="hostFinanceSection" style="display:none; background: #fff; padding: 20px; margin-top: 20px; border-radius: 8px; border: 1px solid #ddd;">
+                <h3 style="color: #9c27b0; margin-top:0;">📊 團購財務結算對帳表</h3>
+                <div id="financeTableContainer"></div>
+            </div>
+
             <div class="btn-group">
                 <div style="flex: 1; display: flex; gap: 10px; align-items: center;">
                     <input type="datetime-local" id="updateDeadlineInput" style="width: auto;">
