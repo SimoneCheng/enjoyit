@@ -34,7 +34,7 @@ class MenuServiceTest {
     @BeforeEach
     void setUp() {
         // 準備測試用的假資料 (Stubbing)
-        testVendor = new Vendor("測試店家");
+        testVendor = new Vendor("測試店家", "02-55556666", "台北市羅斯福路五段5號");
         testVendor.setId("vendor_001");
 
         Menu menu = new Menu();

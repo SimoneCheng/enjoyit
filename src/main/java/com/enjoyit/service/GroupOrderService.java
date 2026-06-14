@@ -4,11 +4,11 @@ import com.enjoyit.domain.GroupOrder;
 import com.enjoyit.domain.OrderItem;
 import com.enjoyit.repository.GroupOrderRepository;
 import org.springframework.stereotype.Service;
+
 import java.time.LocalDateTime;
 import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
-import java.util.stream.Collectors;
 
 @Service
 public class GroupOrderService {
@@ -21,9 +21,6 @@ public class GroupOrderService {
         this.groupOrderRepository = groupOrderRepository;
     }
 
-    /**
-     * 對應 CO-07: publishGroupOrder
-     */
     public String publishGroupOrder(String orderInfo, String announcementContent, String vendorId, String adminPassword, String groupId) {
         GroupOrder order = new GroupOrder(orderInfo);
         String orderId = "order_" + System.currentTimeMillis();
@@ -46,9 +43,7 @@ public class GroupOrderService {
     }
 
     public Collection<GroupOrder> getOrdersByGroupId(String groupId) {
-        return groupOrderRepository.findAll().stream()
-                .filter(order -> groupId.equals(order.getGroupId()))
-                .collect(Collectors.toList());
+        return groupOrderRepository.findByGroupId(groupId);
     }
 
     public void addOrderItem(GroupOrder order, OrderItem item) {
@@ -82,9 +77,6 @@ public class GroupOrderService {
         groupOrderRepository.save(order);
     }
 
-    /**
-     * 對應 CO-08: setOrderDeadline
-     */
     public void setOrderDeadline(GroupOrder order, LocalDateTime newTime) {
         if (order != null) {
             order.setOrderDeadline(newTime);
@@ -99,9 +91,10 @@ public class GroupOrderService {
         }
     }
 
-    /**
-     * 對應 CO-09: 驗證管理者權限
-     */
+    public boolean hasOngoingOrdersByVendor(String vendorId) {
+        return groupOrderRepository.existsByVendorIdAndStatus(vendorId, "進行中");
+    }
+
     public boolean verifyAdminAccess(String inputPassword, String savedPassword) {
         return passwordValidator.isValid(inputPassword, savedPassword);
     }

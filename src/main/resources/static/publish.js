@@ -6,7 +6,7 @@ window.dashboardModules.push(() => {
 async function handlePublish() {
     const orderInfo = document.getElementById('orderName')?.value.trim();
     const announcement = document.getElementById('announcement')?.value.trim();
-    const vendorId = document.getElementById('vendorSelect')?.value;
+    const vendorId = document.getElementById('publishVendorSelect')?.value;
     const adminPassword = document.getElementById('adminPwdSetup')?.value;
     const deadline = document.getElementById('deadline')?.value;
 
@@ -52,3 +52,28 @@ if (typeof module !== 'undefined' && module.exports) {
     // 在 dashboard-base.js 加上： module.exports = { ensureLoggedIn };
     module.exports = { handlePublish };
 }
+async function fetchVendorsForPublish() {
+    const select = document.getElementById('publishVendorSelect');
+    if (!select) return;
+
+    try {
+        const response = await fetch('/api/vendors?activeOnly=true');
+        const vendors = await response.json();
+        
+        const currentVal = select.value;
+        if (vendors && vendors.length > 0) {
+            select.innerHTML = '<option value="">-- 請選擇店家 --</option>' + 
+                vendors.map(v => `<option value="${v.id}">${v.name}</option>`).join('');
+            
+            if (currentVal) select.value = currentVal;
+        } else {
+            select.innerHTML = '<option value="">-- 暫無上架店家 --</option>';
+        }
+    } catch (e) {
+        console.error('無法載入店家清單:', e);
+    }
+}
+
+// 註冊到初始化
+window.dashboardModules.push(fetchVendorsForPublish);
+window.fetchVendorsForPublish = fetchVendorsForPublish;

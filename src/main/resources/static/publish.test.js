@@ -8,7 +8,7 @@ describe('publish.js 發起團購測試', () => {
             <div>
                 <input id="orderName" value="實驗室下午茶" />
                 <input id="announcement" value="大家快來點" />
-                <select id="vendorSelect"><option value="vendor_001">店家A</option></select>
+                <select id="publishVendorSelect"><option value="vendor_001">店家A</option></select>
                 <input id="adminPwdSetup" value="secret123" />
                 <input id="deadline" value="2026-12-31T12:00" />
             </div>

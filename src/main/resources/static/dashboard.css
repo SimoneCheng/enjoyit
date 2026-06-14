@@ -25,3 +25,18 @@ input, select, textarea { width: 100%; padding: 10px; border: 1px solid #ddd; bo
 .category-header h3 { margin: 0; color: var(--primary-color); }
 .item-card { background: white; padding: 10px 15px; border-radius: 6px; margin: 8px 0; border: 1px dashed #ccc; display: flex; justify-content: space-between; align-items: center; }
 .order-form-box { background: white; padding: 15px; border: 2px solid var(--primary-color); border-radius: 8px; margin-top: 10px; display: none; }
+
+/* Modal Styles */
+.modal { display: none; position: fixed; z-index: 1000; left: 0; top: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); }
+.modal-content { background: white; margin: 10% auto; padding: 2rem; width: 400px; border-radius: 8px; box-shadow: 0 4px 20px rgba(0,0,0,0.2); }
+.modal-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 1.5rem; }
+
+/* Table Styles */
+.data-table { width: 100%; border-collapse: collapse; margin-top: 1rem; }
+.data-table th, .data-table td { text-align: left; padding: 12px; border-bottom: 1px solid #eee; }
+.data-table th { background: #f8f9fa; color: #4b4f56; }
+.small-btn { padding: 5px 10px; border-radius: 4px; border: 1px solid #ddd; cursor: pointer; background: white; margin-right: 5px; }
+.small-btn.danger { color: var(--danger-color); border-color: var(--danger-color); }
+.primary-btn { background: var(--primary-color); color: white; border: none; padding: 8px 16px; border-radius: 6px; cursor: pointer; }
+.secondary-btn { background: #e4e6eb; color: #050505; border: none; padding: 8px 16px; border-radius: 6px; cursor: pointer; }
+.header-action { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; }

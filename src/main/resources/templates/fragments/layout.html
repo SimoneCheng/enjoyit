@@ -16,6 +16,7 @@
     <!-- SPA Mode (Button based) -->
     <th:block th:if="${type} == 'spa'">
         <button class="menu-btn" id="nav-publish" th:classappend="${active} == 'publish' ? ' active'" onclick="showSection('publish')">🚀 發起團購</button>
+        <button class="menu-btn" id="nav-vendors" th:classappend="${active} == 'vendors' ? ' active'" onclick="showSection('vendors')">🏪 店家管理</button>
         <button class="menu-btn" id="nav-menu" th:classappend="${active} == 'menu' ? ' active'" onclick="showSection('menu')">📋 店家菜單管理</button>
         <button class="menu-btn" id="nav-orders" th:classappend="${active} == 'orders' ? ' active'" onclick="showSection('orders')">🧾 團購訂單</button>
     </th:block>
@@ -23,6 +24,7 @@
     <!-- Classic Mode (Link based) -->
     <th:block th:if="${type} != 'spa'">
         <a class="menu-btn" th:classappend="${active} == 'publish' ? ' active'" th:href="@{/dashboard/publish}">🚀 發起團購</a>
+        <a class="menu-btn" th:classappend="${active} == 'vendors' ? ' active'" th:href="@{/dashboard/vendors}">🏪 店家管理</a>
         <a class="menu-btn" th:classappend="${active} == 'menu' ? ' active'" th:href="@{/dashboard/menu}">📋 店家菜單管理</a>
         <a class="menu-btn" th:classappend="${active} == 'orders' ? ' active'" th:href="@{/dashboard/orders}">🧾 團購訂單</a>
     </th:block>

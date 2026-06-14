@@ -33,3 +33,6 @@ build/
 .vscode/
 
 node_modules/
+# Local project files
+FEATURE.md
+Homework #7.md

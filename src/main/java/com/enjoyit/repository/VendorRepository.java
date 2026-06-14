@@ -8,4 +8,6 @@ public interface VendorRepository {
     void save(Vendor vendor);
     Optional<Vendor> findById(String id);
     List<Vendor> findAll();
+    List<Vendor> findAllActive();
+    boolean existsByNameAndAddress(String name, String address);
 }

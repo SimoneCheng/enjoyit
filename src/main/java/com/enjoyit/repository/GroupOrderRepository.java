@@ -12,5 +12,9 @@ public interface GroupOrderRepository {
 
     List<GroupOrder> findAll();
 
+    List<GroupOrder> findByGroupId(String groupId);
+
+    boolean existsByVendorIdAndStatus(String vendorId, String status);
+
     void delete(String orderId);
 }
